@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataBridge — Airtable 智能清洗 & 翻译</title>
+<style>
+:root {
+  --bg:#f8f9fb; --surface:#fff; --border:#e5e7eb; --text:#111827; --muted:#6b7280;
+  --accent:#4f46e5; --accent-hover:#4338ca; --accent-light:#eef2ff;
+  --green:#059669; --green-bg:#ecfdf5; --orange:#ea580c; --orange-bg:#fff7ed;
+  --red:#dc2626; --red-bg:#fef2f2; --radius:10px; --radius-sm:6px; --shadow:0 1px 3px rgba(0,0,0,0.06);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+button{cursor:pointer;font-family:inherit}input,select,textarea{font-family:inherit}
+.app-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;height:56px;gap:16px;position:sticky;top:0;z-index:100}
+.logo{font-weight:800;font-size:17px;color:var(--accent);display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.status-badge{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.status-badge.ok{background:var(--green-bg);color:var(--green)}
+.status-badge.off{background:var(--orange-bg);color:var(--orange)}
+.bal-badge{padding:4px 14px;border-radius:20px;font-size:13px;font-weight:600;background:var(--surface);border:1px solid var(--border);cursor:pointer}
+.bal-badge.low{color:var(--red);border-color:var(--red)}.bal-badge:hover{border-color:var(--accent)}
+#user-email{font-size:12px;color:var(--muted)}
+main{max-width:1200px;margin:0 auto;padding:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px}
+.card h3{font-size:16px;margin-bottom:4px}.card .desc{font-size:13px;color:var(--muted);margin-bottom:16px}
+.form-row{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:end}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:12px;font-weight:600;color:var(--muted)}
+.form-group input,.form-group select,.form-group textarea{padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;outline:none;min-width:160px}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;border:1px solid transparent;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent-hover)}
+.btn-outline{background:var(--surface);border-color:var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:var(--red-bg);color:var(--red);border-color:#fecaca}
+.btn-sm{padding:5px 10px;font-size:11px}.btn:disabled{opacity:.5;cursor:not-allowed}
+.chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .15s}
+.chip:hover{border-color:var(--accent)}.chip.selected{background:var(--accent-light);border-color:var(--accent);color:var(--accent);font-weight:600}
+.table-wrap{border:1px solid var(--border);border-radius:var(--radius-sm);overflow:auto;max-height:380px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#f9fafb;padding:8px 12px;text-align:left;font-weight:600;color:var(--muted);font-size:11px;border-bottom:1px solid var(--border);position:sticky;top:0;white-space:nowrap}
+th .field-type{font-size:10px;color:var(--muted);font-weight:400;margin-left:4px}
+td{padding:7px 12px;border-bottom:1px solid #f3f4f6;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.result-new::after{content:' ✨';font-size:10px}
+.status-msg{padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:12px;display:none}
+.status-msg.show{display:block}.status-msg.info{background:var(--accent-light);color:var(--accent)}.status-msg.success{background:var(--green-bg);color:var(--green)}.status-msg.error{background:var(--red-bg);color:var(--red)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:200}
+.modal{background:var(--surface);border-radius:var(--radius);padding:28px;max-width:500px;width:92%;box-shadow:0 4px 24px rgba(0,0,0,.12);max-height:90vh;overflow-y:auto}
+.modal h4{font-size:18px;margin-bottom:4px}.modal .desc{font-size:13px;color:var(--muted);margin-bottom:16px}
+.cost-lines{background:var(--bg);border-radius:var(--radius-sm);padding:12px;margin:12px 0;font-size:13px}
+.cost-lines .line{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)}
+.cost-lines .line:last-child{border-bottom:none;font-weight:700;font-size:14px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.toast{position:fixed;bottom:24px;right:24px;background:#111827;color:#fff;padding:12px 20px;border-radius:var(--radius);font-size:14px;font-weight:500;z-index:300;animation:up .3s}
+.toast.success{background:var(--green)}.toast.error{background:var(--red)}
+@keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.hidden{display:none!important}.loading{opacity:.6;pointer-events:none}
+/* Auth tabs */
+.auth-tabs{display:flex;gap:0;margin-bottom:20px}
+.auth-tab{flex:1;text-align:center;padding:10px;border-bottom:2px solid var(--border);cursor:pointer;font-weight:600;font-size:14px;color:var(--muted);background:none;border-top:none;border-left:none;border-right:none}
+.auth-tab.active{border-bottom-color:var(--accent);color:var(--accent)}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="logo"><div class="logo-dot"></div>DataBridge</div>
+  <span id="header-base-info" style="font-size:12px;color:var(--muted)"></span>
+  <div class="header-right">
+    <span id="user-email"></span>
+    <span class="status-badge off" id="conn-status">⚡ 未连接</span>
+    <span class="bal-badge" id="bal-badge" onclick="showTopupModal()">💎 $0.00</span>
+    <button class="btn btn-sm btn-outline hidden" id="btn-logout" onclick="logout()">退出</button>
+  </div>
+</header>
+
+<main>
+  <!-- Auth Card -->
+  <div class="card" id="section-auth">
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">登录</button>
+      <button class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">注册</button>
+    </div>
+
+    <div id="form-login">
+      <div class="form-row">
+        <div class="form-group" style="flex:1"><label>邮箱</label><input type="email" id="login-email" placeholder="your@email.com"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1"><label>密码</label><input type="password" id="login-password" placeholder="至少6位"></div>
+      </div>
+      <button class="btn btn-primary" onclick="doLogin()">登录</button>
+    </div>
+
+    <div id="form-register" class="hidden">
+      <div class="form-row">
+        <div class="form-group" style="flex:1"><label>邮箱</label><input type="email" id="reg-email" placeholder="your@email.com"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1"><label>密码</label><input type="password" id="reg-password" placeholder="至少6位"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:12px;">
+        <input type="checkbox" id="reg-terms" onchange="document.getElementById('btn-register').disabled=!this.checked">
+        我已阅读并同意 <a href="/terms" target="_blank" style="color:var(--accent);">服务条款</a> 和 <a href="/privacy" target="_blank" style="color:var(--accent);">隐私政策</a>
+      </label>
+      <button class="btn btn-primary" onclick="doRegister()" id="btn-register" disabled>注册</button>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:12px;">🔐 注册需要邮箱验证。密码加密存储。</p>
+
+    <div style="margin-top:20px; padding-top:20px; border-top:1px solid var(--border); text-align:center;">
+      <p style="font-size:13px; color:var(--muted); margin-bottom:10px;">不想注册？先试试看效果</p>
+      <button class="btn btn-primary" onclick="startDemo()" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);font-size:15px;padding:12px 28px;">
+        🎮 体验演示（免费 5 次）
+      </button>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px;">使用示例数据 · 翻译和清洗各 5 次免费 · 无需注册</p>
+    </div>
+  </div>
+
+  <!-- Email verification banner (shown when not verified) -->
+  <div id="verify-banner" class="card hidden" style="text-align:center;background:#fffbeb;border-color:var(--orange);">
+    <strong style="color:var(--orange);">⚠️ 邮箱未验证</strong>
+    <span style="font-size:13px;color:var(--muted);margin-left:8px;">充值和使用服务需要先验证邮箱</span>
+    <div class="form-row" style="justify-content:center;margin-top:8px;">
+      <button class="btn btn-sm btn-outline" onclick="sendVerifyCode()" id="btn-send-code">发送验证码</button>
+      <input type="text" id="input-verify-code" placeholder="6位验证码" style="width:110px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;">
+      <button class="btn btn-sm btn-primary" onclick="verifyEmail()">验证</button>
+    </div>
+  </div>
+
+  <!-- Demo Banner (shown during demo) -->
+  <div id="demo-banner" class="card hidden" style="text-align:center;background:linear-gradient(135deg,#f5f3ff,#eef2ff);border-color:#7c3aed;">
+    <span style="font-size:20px;">🎮</span>
+    <strong style="color:#7c3aed;">演示模式</strong>
+    <span style="font-size:13px;color:var(--muted);margin-left:8px;">使用示例数据 · 免费体验 · <span id="demo-counter">翻译 5/5 · 清洗 5/5</span></span>
+  </div>
+
+  <!-- App sections (hidden until auth/demo) -->
+  <div id="app-sections" class="hidden">
+    <!-- Connect -->
+    <div class="card" id="section-connect">
+      <h3>🔗 连接 Airtable</h3>
+      <p class="desc">输入 Airtable PAT 和 Base ID</p>
+      <div class="form-row">
+        <div class="form-group" style="flex:1;min-width:240px"><label>Airtable PAT</label><input type="password" id="input-pat" placeholder="pat..."></div>
+        <div class="form-group" style="flex:1;min-width:180px"><label>Base ID</label><input type="text" id="input-base" placeholder="app..."></div>
+        <div class="form-group" style="justify-content:end"><button class="btn btn-primary" id="btn-connect" onclick="connectAirtable()">连接</button></div>
+      </div>
+      <p style="font-size:11px;color:var(--muted)">在 <a href="https://airtable.com/create/tokens" target="_blank" style="color:var(--accent)">airtable.com/create/tokens</a> 创建 PAT，需要 data.records:read + data.records:write + schema.bases:read</p>
+    </div>
+
+    <!-- Table -->
+    <div class="card hidden" id="section-table">
+      <h3>📋 选择 Table & 字段</h3>
+      <div class="form-row">
+        <div class="form-group"><label>Table</label><select id="select-table" onchange="loadFields()"><option>-- 先连接 --</option></select></div>
+        <div class="form-group"><label>行数</label><select id="select-max-rows"><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option></select></div>
+        <div style="display:flex;align-items:end"><button class="btn btn-outline" onclick="loadRecords()">📥 加载数据</button></div>
+      </div>
+      <div id="field-chips" class="chip-row"></div>
+      <div class="status-msg" id="status-records"></div>
+      <div class="table-wrap" id="table-container"></div>
+      <div style="margin-top:8px;font-size:12px;color:var(--muted)" id="record-info"></div>
+    </div>
+
+    <!-- Operations -->
+    <div class="card hidden" id="section-ops">
+      <h3>⚡ 操作</h3>
+      <p class="desc" style="font-size:12px;">💰 翻译 <strong>$2/百万字符</strong>（约￥1/50万字）· 清洗 <strong>$0.40/千token</strong>（约 500 条短文本仅 $0.1）· DeepSeek 驱动</p>
+      <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px">
+        <h4 style="margin-bottom:6px">🌐 翻译</h4>
+        <div class="form-row">
+          <div class="form-group"><label>源语言</label><select id="trans-source"><option value="">自动检测</option><option value="EN">英语</option><option value="ZH">中文</option><option value="JA">日语</option></select></div>
+          <div class="form-group"><label>目标语言</label><select id="trans-target"><option value="ZH">简体中文</option><option value="EN">英语</option><option value="JA">日语</option></select></div>
+          <button class="btn btn-primary" onclick="estimateAndExecute('translate')">🌐 翻译</button>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px">
+        <h4 style="margin-bottom:6px">🧹 智能清洗</h4>
+        <div class="form-row">
+          <div class="form-group" style="flex:1"><label>清洗指令</label><input type="text" id="clean-instruction" placeholder="去空格、标准化公司名、标记空值..." style="width:100%"></div>
+          <button class="btn btn-primary" onclick="estimateAndExecute('clean')">🧹 清洗</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="estimateAndExecute('both')" style="background:#7c3aed">⚡ 一键清洗+翻译</button>
+    </div>
+
+    <!-- Results -->
+    <div class="card hidden" id="section-results">
+      <h3>✅ 执行结果</h3>
+      <p class="desc" id="result-desc"></p>
+      <div class="table-wrap" id="result-table-container"></div>
+      <div class="status-msg" id="status-results"></div>
+      <div class="form-row" style="margin-top:12px">
+        <div class="form-group"><label>写入模式</label><select id="write-mode"><option value="new_column">新建列 (推荐)</option><option value="overwrite">覆盖原列</option></select></div>
+        <button class="btn btn-primary" onclick="writeBack()">✅ 写回 Airtable</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Cost Estimate Modal -->
+<div class="modal-overlay hidden" id="modal-estimate">
+  <div class="modal">
+    <h4 id="modal-est-title">💰 成本预估</h4>
+    <p class="desc" id="modal-est-desc"></p>
+    <div class="cost-lines" id="modal-est-lines"></div>
+    <div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);margin:12px 0"><span>当前余额</span><span id="modal-est-balance" style="font-weight:700"></span></div>
+    <div id="modal-est-insufficient" style="background:var(--red-bg);border:1px solid var(--red);border-radius:var(--radius-sm);padding:12px;margin-top:8px;font-size:13px;color:var(--red);display:none"></div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal('modal-estimate')">取消</button><button class="btn btn-primary" id="btn-est-confirm" onclick="confirmExecute()">确认执行</button></div>
+  </div>
+</div>
+
+<!-- Topup Modal -->
+<div class="modal-overlay hidden" id="modal-topup">
+  <div class="modal">
+    <h4>💎 充值 Credits · 充越多送越多</h4>
+    <p class="desc">用不完不过期，可留到下月。翻译 $2/M 字符 · 清洗 $0.40/K token</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      <div onclick="selectTopup(10)" class="topup-opt" data-amount="10" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer"><strong>$10</strong><br><span style="font-size:11px;color:var(--green)">到账 $12（送 $2）</span></div>
+      <div onclick="selectTopup(50)" class="topup-opt selected" data-amount="50" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--green);border-radius:var(--radius-sm);text-align:center;cursor:pointer;background:var(--green-bg)"><strong>$50</strong><br><span style="font-size:11px;color:var(--green);font-weight:700">🔥 超值！到账 $65（送 $15）</span></div>
+      <div onclick="selectTopup(100)" class="topup-opt" data-amount="100" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer"><strong>$100</strong><br><span style="font-size:11px;color:var(--green);font-weight:700">🚀 最超值！到账 $140（送 $40）</span></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal('modal-topup')">取消</button><button class="btn btn-outline" onclick="doTopup()" style="background:var(--green);color:#fff;border-color:var(--green);">💳 Stripe 支付</button></div>
+  </div>
+</div>
+
+<!-- Upgrade Prompt Modal (shown when demo limits exhausted) -->
+<div class="modal-overlay hidden" id="modal-upgrade">
+  <div class="modal" style="text-align:center;">
+    <div style="font-size:48px;margin-bottom:12px;">🎉</div>
+    <h4>效果满意吗？</h4>
+    <p class="desc">你已经体验了 DataBridge 的翻译和清洗能力。<br>注册后即可连接你自己的 Airtable，处理真实数据。</p>
+    <div style="display:flex;gap:10px;margin:16px 0;justify-content:center;">
+      <div style="text-align:center;padding:12px 16px;background:var(--green-bg);border-radius:var(--radius-sm);">
+        <div style="font-size:20px;font-weight:800;color:var(--green);">$2/M</div>
+        <div style="font-size:11px;color:var(--muted);">翻译 / 百万字符</div>
+      </div>
+      <div style="text-align:center;padding:12px 16px;background:var(--accent-light);border-radius:var(--radius-sm);">
+        <div style="font-size:20px;font-weight:800;color:var(--accent);">$0.40/K</div>
+        <div style="font-size:11px;color:var(--muted);">清洗 / 千 token</div>
+      </div>
+      <div style="text-align:center;padding:12px 16px;background:var(--purple-bg);border-radius:var(--radius-sm);">
+        <div style="font-size:20px;font-weight:800;color:#7c3aed;">DeepSeek</div>
+        <div style="font-size:11px;color:var(--muted);">国内直连 AI</div>
+      </div>
+    </div>
+    <div class="modal-actions" style="justify-content:center;">
+      <button class="btn btn-outline" onclick="closeModal('modal-upgrade');resetDemo();">再试一次</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-upgrade');switchToRegister();">📝 立即注册</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<footer style="text-align:center;padding:20px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);margin-top:24px;">
+  © 2026 DataBridge ·
+  <a href="/terms" target="_blank" style="color:var(--muted);">服务条款</a> ·
+  <a href="/privacy" target="_blank" style="color:var(--muted);">隐私政策</a> ·
+  Powered by DeepSeek
+</footer>
+
+<script>
+// ── State ──
+let token = localStorage.getItem('databridge_token') || '';
+let user = null;
+const PRICE_TRANS = 2;      // $2/million chars (~￥1/50万字)
+const PRICE_CLEAN = 0.40;    // $0.40/1K tokens
+const API = '';
+
+let state = { pat:'', baseId:'', tables:[], fields:[], records:[], selectedFields:[], lastEstimate:null, lastResults:null, pendingAction:null };
+
+// ── Demo mode ──
+let isDemo = false;
+let demoSid = '';
+let demoLimits = { translateLeft:5, cleanLeft:5, maxPerType:5 };
+
+// ── Auth ──
+function authHeaders() { return token ? { 'Authorization':`Bearer ${token}`, 'Content-Type':'application/json' } : { 'Content-Type':'application/json' }; }
+async function api(url, opts={}) {
+  const res = await fetch(API+url, { ...opts, headers: { ...authHeaders(), ...(opts.headers||{}) } });
+  if (res.status === 401) { logout(); throw new Error('登录已过期'); }
+  if (res.status === 403) {
+    const d = await res.json().catch(()=>({}));
+    if (d.emailNotVerified) { document.getElementById('verify-banner').classList.remove('hidden'); throw new Error('请先验证邮箱'); }
+  }
+  return res;
+}
+
+function switchAuthTab(tab) {
+  document.getElementById('tab-login').classList.toggle('active', tab==='login');
+  document.getElementById('tab-register').classList.toggle('active', tab==='register');
+  document.getElementById('form-login').classList.toggle('hidden', tab!=='login');
+  document.getElementById('form-register').classList.toggle('hidden', tab!=='register');
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!email||!password) return toast('请填写邮箱和密码','error');
+  try {
+    const res = await fetch(API+'/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    token = data.token; user = data.user;
+    localStorage.setItem('databridge_token', token);
+    onAuthSuccess();
+  } catch(e) { toast('❌ '+e.message,'error'); }
+}
+
+async function doRegister() {
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+  if (!email||!password) return toast('请填写邮箱和密码','error');
+  if (password.length < 6) return toast('密码至少6位','error');
+  try {
+    const res = await fetch(API+'/api/auth/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    token = data.token; user = data.user;
+    localStorage.setItem('databridge_token', token);
+    onAuthSuccess();
+  } catch(e) { toast('❌ '+e.message,'error'); }
+}
+
+function logout() {
+  token = ''; user = null; localStorage.removeItem('databridge_token');
+  document.getElementById('section-auth').classList.remove('hidden');
+  document.getElementById('app-sections').classList.add('hidden');
+  document.getElementById('btn-logout').classList.add('hidden');
+  document.getElementById('user-email').textContent = '';
+  updateBalance(0);
+}
+
+async function onAuthSuccess() {
+  document.getElementById('section-auth').classList.add('hidden');
+  document.getElementById('app-sections').classList.remove('hidden');
+  document.getElementById('btn-logout').classList.remove('hidden');
+  document.getElementById('btn-logout').textContent = '退出';
+  document.getElementById('btn-logout').onclick = logout;
+  document.getElementById('user-email').textContent = '👤 '+user.email;
+  updateBalance(user.balance);
+
+  // Check email verification
+  if (user.emailVerified === false) {
+    document.getElementById('verify-banner').classList.remove('hidden');
+    toast('⚠️ 请先验证邮箱');
+  } else {
+    document.getElementById('verify-banner').classList.add('hidden');
+    toast('✅ 登录成功！');
+  }
+}
+
+async function sendVerifyCode() {
+  try {
+    const res = await api('/api/auth/send-verification', { method:'POST' });
+    if (!res.ok) throw new Error((await res.json()).error);
+    toast('📧 验证码已发送到 ' + user.email, 'success');
+    document.getElementById('btn-send-code').disabled = true;
+    document.getElementById('btn-send-code').textContent = '已发送';
+  } catch(e) { toast('❌ '+e.message,'error'); }
+}
+
+async function verifyEmail() {
+  const code = document.getElementById('input-verify-code').value.trim();
+  if (!code) return toast('请输入验证码','error');
+  try {
+    const res = await api('/api/auth/verify-email', { method:'POST', body:JSON.stringify({code}) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    user.emailVerified = true;
+    document.getElementById('verify-banner').classList.add('hidden');
+    toast('✅ 邮箱验证成功！','success');
+  } catch(e) { toast('❌ '+e.message,'error'); }
+}
+
+// Auto-login on page load
+if (token) {
+  (async () => {
+    try {
+      const res = await fetch(API+'/api/auth/me', { headers: authHeaders() });
+      if (res.ok) { user = await res.json(); onAuthSuccess(); }
+      else { logout(); }
+    } catch { logout(); }
+  })();
+}
+
+// Handle Stripe redirect
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('topup') === 'success') {
+  setTimeout(() => toast('✅ 支付成功！请刷新查看余额', 'success'), 500);
+  window.history.replaceState({}, '', '/');
+} else if (urlParams.get('topup') === 'cancel') {
+  setTimeout(() => toast('支付已取消', 'error'), 500);
+  window.history.replaceState({}, '', '/');
+}
+
+// ── Connect ──
+async function connectAirtable() {
+  const pat = document.getElementById('input-pat').value.trim();
+  const baseId = document.getElementById('input-base').value.trim();
+  if (!pat) return toast('请输入 PAT','error');
+  if (!baseId) return toast('请输入 Base ID','error');
+  state.pat = pat; state.baseId = baseId;
+  document.getElementById('btn-connect').disabled = true;
+  try {
+    const res = await api(`/api/bases/${baseId}/tables`, { headers:{'x-airtable-pat':pat} });
+    if (!res.ok) throw new Error((await res.json()).error);
+    const data = await res.json();
+    state.tables = data.tables;
+    document.getElementById('select-table').innerHTML = data.tables.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+    document.getElementById('conn-status').textContent = '✅ 已连接';
+    document.getElementById('conn-status').className = 'status-badge ok';
+    document.getElementById('header-base-info').textContent = '📁 '+baseId.slice(0,12)+'...';
+    document.getElementById('section-table').classList.remove('hidden');
+    document.getElementById('section-ops').classList.remove('hidden');
+    await loadFields(); await loadRecords();
+    toast('✅ 连接成功！');
+  } catch(e) { toast('❌ '+e.message,'error'); }
+  document.getElementById('btn-connect').disabled = false;
+}
+
+// ── Fields ──
+async function loadFields() {
+  if (!state.tables.length) return;
+  const tableId = document.getElementById('select-table').value;
+  try {
+    const res = await api(`/api/bases/${state.baseId}/tables/${tableId}/fields`, { headers:{'x-airtable-pat':state.pat} });
+    if (!res.ok) throw new Error((await res.json()).error);
+    const data = await res.json();
+    state.fields = data.fields;
+    const textTypes = ['singleLineText','multilineText','richText','email','phoneNumber','url','singleSelect','multipleSelects','formula','rollup'];
+    const tf = data.fields.filter(f=>textTypes.includes(f.type));
+    state.selectedFields = tf.map(f=>f.name).slice(0,3);
+    document.getElementById('field-chips').innerHTML = tf.map(f=>
+      `<span class="chip ${state.selectedFields.includes(f.name)?'selected':''}" onclick="toggleField('${f.name.replace(/'/g,"\\'")}',this)" title="${f.type}">${f.name} <span class="field-type">${f.type}</span></span>`
+    ).join('') || '<span style="font-size:12px;color:var(--muted)">无文本字段</span>';
+  } catch(e) { showStatus('status-records','⚠️ '+e.message,'error'); }
+}
+
+function toggleField(name,el) {
+  if (state.selectedFields.includes(name)) { state.selectedFields = state.selectedFields.filter(f=>f!==name); el.classList.remove('selected'); }
+  else { state.selectedFields.push(name); el.classList.add('selected'); }
+}
+
+// ── Records ──
+async function loadRecords() {
+  const tableId = document.getElementById('select-table').value;
+  const maxRecords = document.getElementById('select-max-rows').value;
+  document.getElementById('table-container').innerHTML = '<p style="padding:20px;color:var(--muted)">加载中...</p>';
+  try {
+    const res = await api('/api/records', { method:'POST', headers:{'x-airtable-pat':state.pat}, body:JSON.stringify({baseId:state.baseId, tableId, maxRecords:parseInt(maxRecords)}) });
+    if (!res.ok) throw new Error((await res.json()).error);
+    const data = await res.json();
+    state.records = data.records;
+    if (!data.records.length) { document.getElementById('table-container').innerHTML = '<p style="padding:20px;color:var(--muted)">无记录</p>'; return; }
+    const keys = [...new Set(data.records.flatMap(r=>Object.keys(r)))].filter(k=>k!=='id').slice(0,8);
+    let html = '<table><thead><tr><th>#</th>'+keys.map(k=>`<th>${k}</th>`).join('')+'</tr></thead><tbody>';
+    data.records.forEach((r,i) => { html += '<tr><td>'+(i+1)+'</td>'+keys.map(k=>`<td>${r[k]!==undefined&&r[k]!==null?String(r[k]).slice(0,80):'<span style="color:var(--muted)">—</span>'}</td>`).join('')+'</tr>'; });
+    html += '</tbody></table>';
+    document.getElementById('table-container').innerHTML = html;
+    document.getElementById('record-info').textContent = `共 ${data.records.length} 条 · ${state.selectedFields.length} 个字段`;
+  } catch(e) { showStatus('status-records','❌ '+e.message,'error'); }
+}
+
+// ── Estimate & Execute ──
+async function estimateAndExecute(action) {
+  if (!state.selectedFields.length) return toast('请选择字段','error');
+  if (!state.records.length) return toast('请加载数据','error');
+  state.pendingAction = action;
+
+  // ── Demo mode: skip estimate, execute directly (free) ──
+  if (isDemo) {
+    // Check limits
+    if (action==='translate' && demoLimits.translateLeft<=0) return toast('翻译免费次数已用完','error');
+    if (action==='clean' && demoLimits.cleanLeft<=0) return toast('清洗免费次数已用完','error');
+    if (action==='both' && (demoLimits.translateLeft<=0||demoLimits.cleanLeft<=0)) return toast('免费次数不足','error');
+
+    document.getElementById('section-ops').classList.add('loading');
+    try {
+      const res = await fetch(API+'/api/demo/execute', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          sessionId: demoSid, action,
+          fields: state.selectedFields,
+          sourceLang: document.getElementById('trans-source').value,
+          targetLang: document.getElementById('trans-target').value,
+          cleaningInstruction: document.getElementById('clean-instruction').value||'Clean data'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (data.limitReached) {
+        demoLimits = { ...demoLimits, translateLeft:0, cleanLeft:0 };
+        updateDemoCounter();
+        document.getElementById('modal-upgrade').classList.remove('hidden');
+        return;
+      }
+      demoLimits = { translateLeft:data.limits.translateLeft, cleanLeft:data.limits.cleanLeft, maxPerType:data.limits.maxPerType };
+      updateDemoCounter();
+      state.lastResults = data.results;
+      showResults({ ...data, cost:0, newBalance:0 });
+      toast(`✅ 免费试用完成！剩余: 翻译 ${demoLimits.translateLeft} 次 · 清洗 ${demoLimits.cleanLeft} 次`, 'success');
+      if (data.showUpgradePrompt) {
+        setTimeout(() => document.getElementById('modal-upgrade').classList.remove('hidden'), 2000);
+      }
+    } catch(e) { toast('❌ '+e.message,'error'); }
+    document.getElementById('section-ops').classList.remove('loading');
+    return;
+  }
+
+  // ── Normal mode (authenticated) ──
+  const records = state.records.map(r=>{ const o={}; state.selectedFields.forEach(f=>{if(r[f]!==undefined)o[f]=r[f]}); return o; });
+  const body = { action, records, fields:state.selectedFields, sourceLang:document.getElementById('trans-source').value, targetLang:document.getElementById('trans-target').value, cleaningInstruction:document.getElementById('clean-instruction').value||'Clean data' };
+
+  try {
+    const res = await api('/api/estimate', { method:'POST', body:JSON.stringify(body) });
+    if (!res.ok) throw new Error((await res.json()).error);
+    const est = await res.json();
+    state.lastEstimate = est;
+
+    const userRes = await api('/api/users/me');
+    const u = await userRes.json();
+    user = u; updateBalance(u.balance);
+
+    const titles = { translate:'🌐 翻译成本', clean:'🧹 清洗成本', both:'⚡ 清洗+翻译成本' };
+    document.getElementById('modal-est-title').textContent = titles[action];
+    document.getElementById('modal-est-desc').textContent = `${est.recordCount} 条 · ${est.fieldCount} 个字段`;
+
+    let lines = '';
+    if (est.breakdown.translation) lines += `<div class="line"><span>翻译 (${est.breakdown.translation.chars.toLocaleString()} 字符 × $${PRICE_TRANS}/M)</span><span>$${est.breakdown.translation.cost.toFixed(4)}</span></div>`;
+    if (est.breakdown.cleaning) lines += `<div class="line"><span>清洗 (${est.breakdown.cleaning.tokens.toLocaleString()} tokens × $${PRICE_CLEAN}/1K)</span><span>$${est.breakdown.cleaning.cost.toFixed(4)}</span></div>`;
+    lines += `<div class="line"><span><strong>合计</strong></span><span style="color:var(--accent)"><strong>$${est.finalCost.toFixed(4)}</strong></span></div>`;
+    document.getElementById('modal-est-lines').innerHTML = lines;
+    document.getElementById('modal-est-balance').textContent = '$'+(u.balance||0).toFixed(2);
+
+    const insuf = document.getElementById('modal-est-insufficient');
+    const btn = document.getElementById('btn-est-confirm');
+    if ((u.balance||0) < est.finalCost) {
+      insuf.style.display = ''; insuf.innerHTML = `⚠️ <strong>余额不足！</strong>需要 $${est.finalCost}，当前 $${(u.balance||0).toFixed(2)}。<a href="#" onclick="closeModal('modal-estimate');showTopupModal()" style="color:var(--accent);font-weight:600">充值 →</a>`;
+      btn.disabled = true; btn.textContent = '余额不足';
+    } else {
+      insuf.style.display = 'none'; btn.disabled = false; btn.textContent = '确认执行 ($'+est.finalCost.toFixed(4)+')';
+    }
+    document.getElementById('modal-estimate').classList.remove('hidden');
+  } catch(e) { toast('❌ '+e.message,'error'); }
+}
+
+async function confirmExecute() {
+  if (!state.lastEstimate||!state.pendingAction) return;
+  document.getElementById('btn-est-confirm').disabled = true;
+  const body = { userId:user.id, action:state.pendingAction, records:state.records.map(r=>{const o={};state.selectedFields.forEach(f=>{if(r[f]!==undefined)o[f]=r[f]});return o}), fields:state.selectedFields, sourceLang:document.getElementById('trans-source').value, targetLang:document.getElementById('trans-target').value, cleaningInstruction:document.getElementById('clean-instruction').value||'Clean data' };
+  try {
+    const res = await api('/api/execute', { method:'POST', body:JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) {
+      if (res.status===402) { toast('❌ 余额不足！需要 $'+data.required,'error'); closeModal('modal-estimate'); showTopupModal(); return; }
+      if (res.status===429) { toast('⚠️ 请求太频繁，请1分钟后再试','error'); closeModal('modal-estimate'); return; }
+      throw new Error(data.error);
+    }
+    closeModal('modal-estimate'); state.lastResults = data.results; updateBalance(data.newBalance);
+    toast('✅ 完成！扣费 $'+data.cost.toFixed(4)+' · '+data.backend,'success');
+    showResults(data);
+  } catch(e) { toast('❌ '+e.message,'error'); }
+  document.getElementById('btn-est-confirm').disabled = false;
+}
+
+function showResults(data) {
+  const section = document.getElementById('section-results'); section.classList.remove('hidden');
+  document.getElementById('result-desc').textContent = `扣费 $${data.cost.toFixed(4)} · 余额 $${data.newBalance.toFixed(2)} · 后端: ${data.backend}`;
+  const fields = state.selectedFields;
+  let html = '<table><thead><tr><th>#</th>'+fields.map(f=>`<th>${f} (原)</th><th>${f} (新)</th>`).join('')+'</tr></thead><tbody>';
+  state.records.forEach((r,i)=>{
+    html += '<tr><td>'+(i+1)+'</td>';
+    fields.forEach(f=>{
+      const orig = r[f]||''; let nv = orig;
+      if (data.results.cleaned?.[i]?.[f]) nv = data.results.cleaned[i][f];
+      if (data.results.translated?.[i]?.[f]) nv = data.results.translated[i][f];
+      html += `<td>${String(orig).slice(0,40)||'—'}</td><td class="${String(nv)!==String(orig)?'result-new':''}">${String(nv).slice(0,40)}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('result-table-container').innerHTML = html;
+  showStatus('status-results','✅ 完成！选择写入模式后点"写回 Airtable"','success');
+}
+
+// ── Write Back ──
+async function writeBack() {
+  if (isDemo) return toast('演示模式使用只读数据，注册后可写回你自己的 Airtable','error');
+  if (!state.lastResults) return toast('无结果','error');
+  const mode = document.getElementById('write-mode').value;
+  const updates = [];
+  state.records.forEach((r,i)=>{
+    const fields = {};
+    state.selectedFields.forEach(f=>{
+      let nv = r[f]||'';
+      if (state.lastResults.cleaned?.[i]?.[f]) nv = state.lastResults.cleaned[i][f];
+      if (state.lastResults.translated?.[i]?.[f]) nv = state.lastResults.translated[i][f];
+      const tf = mode==='new_column' ? f+' (DataBridge)' : f;
+      if (String(nv)!==String(r[f]||'')) fields[tf] = nv;
+    });
+    if (Object.keys(fields).length) updates.push({id:r.id,fields});
+  });
+  if (!updates.length) return toast('无变更','error');
+  try {
+    const res = await api('/api/writeback-v2', { method:'POST', headers:{'x-airtable-pat':state.pat}, body:JSON.stringify({baseId:state.baseId, tableId:document.getElementById('select-table').value, updates}) });
+    if (!res.ok) throw new Error((await res.json()).error);
+    const data = await res.json();
+    toast('✅ 写回成功！'+data.updated+' 条','success');
+    showStatus('status-results','✅ '+data.updated+' 条已写入 Airtable','success');
+  } catch(e) { showStatus('status-results','❌ '+e.message,'error'); }
+}
+
+// ── Demo Mode ──
+async function startDemo() {
+  try {
+    const res = await fetch(API+'/api/demo/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    if (!res.ok) throw new Error('Demo start failed');
+    const data = await res.json();
+    isDemo = true; demoSid = data.sessionId;
+    demoLimits = { translateLeft: data.limits.translateLeft, cleanLeft: data.limits.cleanLeft, maxPerType: data.limits.maxPerType };
+
+    // Populate state with demo data
+    state.pat = 'demo_pat'; state.baseId = data.baseId;
+    state.fields = data.fields; state.records = data.records;
+
+    // Update UI
+    document.getElementById('section-auth').classList.add('hidden');
+    document.getElementById('app-sections').classList.remove('hidden');
+    document.getElementById('demo-banner').classList.remove('hidden');
+    document.getElementById('btn-logout').classList.remove('hidden');
+    document.getElementById('btn-logout').textContent = '结束演示';
+    document.getElementById('btn-logout').onclick = resetDemo;
+    document.getElementById('user-email').textContent = '🎮 演示用户';
+    document.getElementById('conn-status').textContent = '🎮 演示数据';
+    document.getElementById('conn-status').className = 'status-badge ok';
+    document.getElementById('header-base-info').textContent = '📁 Sales Leads (示例)';
+    document.getElementById('section-connect').classList.add('hidden');
+    document.getElementById('section-ops').classList.remove('hidden');
+    document.getElementById('section-table').classList.remove('hidden');
+    updateDemoCounter();
+    updateBalance(-1); // hide balance display
+
+    // Auto-load table UI
+    document.getElementById('select-table').innerHTML = `<option value="${data.tableId}">${data.tableName}</option>`;
+    const textTypes = ['singleLineText','multilineText','richText','email','phoneNumber','url','singleSelect','multipleSelects','formula','rollup','number'];
+    const tf = data.fields.filter(f=>textTypes.includes(f.type));
+    state.selectedFields = tf.map(f=>f.name).slice(0,3);
+    document.getElementById('field-chips').innerHTML = tf.map(f=>
+      `<span class="chip ${state.selectedFields.includes(f.name)?'selected':''}" onclick="toggleField('${f.name.replace(/'/g,"\\'")}',this)" title="${f.type}">${f.name}</span>`
+    ).join('');
+    renderDemoTable();
+    toast('🎮 演示模式已启动！翻译和清洗各可免费试用 5 次');
+  } catch(e) { toast('❌ 演示启动失败: '+e.message,'error'); }
+}
+
+function renderDemoTable() {
+  const records = state.records;
+  if (!records.length) return;
+  const keys = [...new Set(records.flatMap(r=>Object.keys(r)))].filter(k=>k!=='id').slice(0,6);
+  let html = '<table><thead><tr><th>#</th>'+keys.map(k=>`<th>${k}</th>`).join('')+'</tr></thead><tbody>';
+  records.forEach((r,i)=>{
+    html += '<tr><td>'+(i+1)+'</td>'+keys.map(k=>`<td>${r[k]!==undefined&&r[k]!==null?String(r[k]).slice(0,60):'<span style="color:var(--muted)">—</span>'}</td>`).join('')+'</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('table-container').innerHTML = html;
+  document.getElementById('record-info').textContent = `共 ${records.length} 条示例数据 · ${state.selectedFields.length} 个字段`;
+}
+
+function updateDemoCounter() {
+  document.getElementById('demo-counter').textContent = `翻译 ${demoLimits.translateLeft}/${demoLimits.maxPerType} · 清洗 ${demoLimits.cleanLeft}/${demoLimits.maxPerType}`;
+  // Check if all exhausted
+  if (demoLimits.translateLeft <= 0 && demoLimits.cleanLeft <= 0) {
+    setTimeout(() => document.getElementById('modal-upgrade').classList.remove('hidden'), 1500);
+  }
+}
+
+function resetDemo() {
+  isDemo = false; demoSid = ''; state = { pat:'', baseId:'', tables:[], fields:[], records:[], selectedFields:[], lastEstimate:null, lastResults:null, pendingAction:null };
+  demoLimits = { translateLeft:5, cleanLeft:5, maxPerType:5 };
+  document.getElementById('demo-banner').classList.add('hidden');
+  document.getElementById('app-sections').classList.add('hidden');
+  document.getElementById('section-connect').classList.remove('hidden');
+  document.getElementById('section-table').classList.add('hidden');
+  document.getElementById('section-ops').classList.add('hidden');
+  document.getElementById('section-results').classList.add('hidden');
+  document.getElementById('section-auth').classList.remove('hidden');
+  document.getElementById('btn-logout').classList.add('hidden');
+  document.getElementById('user-email').textContent = '';
+  document.getElementById('conn-status').textContent = '⚡ 未连接';
+  document.getElementById('conn-status').className = 'status-badge off';
+  document.getElementById('header-base-info').textContent = '';
+  document.getElementById('bal-badge').textContent = '💎 $0.00';
+  toast('演示已结束，注册后即可处理自己的数据！');
+}
+
+function switchToRegister() {
+  resetDemo();
+  switchAuthTab('register');
+  document.getElementById('section-auth').scrollIntoView({ behavior:'smooth' });
+}
+
+// ── Balance & Topup ──
+function updateBalance(bal) {
+  const badge = document.getElementById('bal-badge');
+  if (isDemo) { badge.textContent = '🎮 免费试用'; badge.className = 'bal-badge'; return; }
+  badge.textContent = '💎 $'+parseFloat(bal).toFixed(2);
+  badge.className = 'bal-badge'+(parseFloat(bal)<1?' low':'');
+}
+
+function showTopupModal() {
+  if (isDemo) return toast('演示模式无需充值，注册后即可充值使用','error');
+  document.getElementById('modal-topup').classList.remove('hidden');
+}
+
+async function doTopup() {
+  try {
+    // Try Stripe checkout first
+    const res = await api('/api/stripe/create-checkout', { method:'POST', body:JSON.stringify({amount:state2.topupAmount}) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) { closeModal('modal-topup'); window.location.href = data.url; return; }
+    }
+    // Fallback: direct topup (when Stripe not configured)
+    const res2 = await api('/api/users/me/topup', { method:'POST', body:JSON.stringify({amount:state2.topupAmount}) });
+    if (!res2.ok) throw new Error((await res2.json()).error);
+    const data = await res2.json();
+    updateBalance(data.newBalance); closeModal('modal-topup');
+    toast(`✅ 充值 $${data.charged} + 奖励 $${data.bonus} = $${data.credited}`, 'success');
+  } catch(e) { toast('❌ '+e.message,'error'); }
+}
+
+let state2 = { topupAmount:50 };
+function selectTopup(amount) { state2.topupAmount = amount; document.querySelectorAll('.topup-opt').forEach(e=>{e.style.borderColor='var(--border)';e.style.background='';e.classList.remove('selected')}); const el=document.querySelector(`[data-amount="${amount}"]`); if(el){el.style.borderColor='var(--green)';el.style.background='var(--green-bg)';el.classList.add('selected')} }
+function showTopupModal() { document.getElementById('modal-topup').classList.remove('hidden'); }
+
+// ── Helpers ──
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function showStatus(id,msg,type) { const el=document.getElementById(id); el.textContent=msg; el.className='status-msg'+(msg?' show '+type:''); }
+function toast(msg,type) { const c=document.getElementById('toast-container'); const el=document.createElement('div'); el.className='toast '+(type||''); el.textContent=msg; c.appendChild(el); setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s'},3000); setTimeout(()=>el.remove(),3500); }
+</script>
+</body>
+</html>

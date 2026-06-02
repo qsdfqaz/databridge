@@ -1,0 +1,36 @@
+# DataBridge — Render.com deployment config
+# One-click deploy: https://render.com
+
+services:
+  - type: web
+    name: databridge
+    env: node
+    region: singapore  # 新加坡节点，国内访问较友好
+    buildCommand: npm install
+    startCommand: npm start
+    plan: starter  # $7/month, upgrade to standard for more RAM
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: DEEPSEEK_API_KEY
+        sync: false  # 手动在 Render Dashboard 设置
+      - key: DEEPSEEK_API_URL
+        value: https://api.deepseek.com/v1
+      - key: DEEPSEEK_MODEL
+        value: deepseek-chat
+      - key: JWT_SECRET
+        generateValue: true  # Render 自动生成随机值
+
+# ── Deployment Steps ──
+# 1. Push this project to GitHub
+# 2. Go to https://dashboard.render.com → New → Web Service
+# 3. Connect your GitHub repo
+# 4. Render auto-detects render.yaml — click "Apply"
+# 5. In Dashboard → Environment, manually set:
+#    DEEPSEEK_API_KEY = sk-your-real-key
+# 6. Deploy! Your app will be at https://databridge.onrender.com
+#
+# Free alternatives:
+# - Railway: https://railway.app (similar, $5 credit)
+# - Fly.io: https://fly.io (free tier, needs Dockerfile)
+# - Vercel: only works with serverless, not Express
