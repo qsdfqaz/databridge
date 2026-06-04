@@ -178,20 +178,62 @@ const authLimiter = rateLimit({
 });
 
 // ── LLM Helpers ──
-async function llmChat(messages, maxTokens = 2000) {
+async function llmChat(messages, maxTokens = 2000, retries = 3) {
   const isDS = LLM_BACKEND === 'deepseek';
   const url = isDS ? `${DEEPSEEK_URL}/chat/completions` : 'https://api.openai.com/v1/chat/completions';
   const key = isDS ? DEEPSEEK_KEY : OPENAI_KEY;
   const model = isDS ? DEEPSEEK_MODEL : OPENAI_MODEL;
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages, temperature: 0.1, max_tokens: maxTokens })
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.message || `${LLM_BACKEND} API error`);
-  return data;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages, temperature: 0.1, max_tokens: maxTokens }),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+
+      const data = await res.json();
+      if (res.ok) return data;
+
+      // Retryable errors
+      if (res.status === 429 || res.status === 503 || res.status === 502) {
+        const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+        console.log(`[RETRY] ${LLM_BACKEND} ${res.status}, attempt ${attempt + 1}/${retries}, waiting ${Math.round(delay)}ms`);
+        if (attempt < retries - 1) { await new Promise(r => setTimeout(r, delay)); continue; }
+      }
+
+      // Map common errors to friendly Chinese messages
+      const errMap = {
+        'rate_limit': 'AI 服务繁忙，请稍后重试',
+        'insufficient_quota': 'AI 服务额度不足，请联系管理员',
+        'invalid_api_key': 'AI 服务密钥无效',
+        'timeout': 'AI 服务响应超时，正在重试...',
+        'context_length': '数据量过大，请减少选中行数'
+      };
+      const msg = data.error?.message || data.error || '';
+      for (const [k, v] of Object.entries(errMap)) {
+        if (msg.includes(k)) throw new Error(v);
+      }
+      throw new Error(msg || `${LLM_BACKEND} 服务异常 (${res.status})`);
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error('AI 服务响应超时，请减少数据量后重试');
+      if (attempt === retries - 1 || !e.message.includes('重试')) throw e;
+    }
+  }
+}
+
+// Batch job queue (in-memory for MVP)
+const batchJobs = {};
+function createBatchJob(userId, action, records, fields, opts) {
+  const jobId = 'job_' + Date.now().toString(36);
+  const totalBatches = Math.ceil(records.length / 10);
+  batchJobs[jobId] = { jobId, userId, action, fields, opts, totalBatches, completedBatches: 0, progress: 0, status: 'queued', results: { cleaned: {}, translated: {} }, totalCost: 0, createdAt: Date.now(), resultsPerBatch: [] };
+  return jobId;
 }
 
 // ── Translation ──
@@ -634,7 +676,141 @@ app.post('/api/users/me/topup', authRequired, (req, res) => {
 
 app.get('/api/users/me/usage', authRequired, (req, res) => {
   const usage = readJSON(USAGE_FILE);
-  res.json(usage.filter(u => u.userId === req.userId).slice(-50));
+  const userUsage = usage.filter(u => u.userId === req.userId);
+
+  // Aggregate stats
+  const now = new Date();
+  const thisMonth = userUsage.filter(u => new Date(u.timestamp).getMonth() === now.getMonth() && new Date(u.timestamp).getFullYear() === now.getFullYear());
+  const thisWeek = userUsage.filter(u => (now - new Date(u.timestamp)) < 7 * 86400000);
+
+  const stats = {
+    totalSpent: parseFloat(userUsage.reduce((s, u) => s + (u.cost || 0), 0).toFixed(4)),
+    thisMonth: parseFloat(thisMonth.reduce((s, u) => s + (u.cost || 0), 0).toFixed(4)),
+    thisWeek: parseFloat(thisWeek.reduce((s, u) => s + (u.cost || 0), 0).toFixed(4)),
+    translateCount: userUsage.filter(u => u.action === 'translate' || u.action === 'both').length,
+    cleanCount: userUsage.filter(u => u.action === 'clean' || u.action === 'both').length,
+    topupCount: userUsage.filter(u => u.action === 'topup' || u.action === 'stripe_topup').length,
+    // Monthly breakdown for chart
+    monthlyBreakdown: getMonthlyBreakdown(userUsage),
+    recent: userUsage.slice(-50).reverse()
+  };
+  res.json(stats);
+});
+
+function getMonthlyBreakdown(usage) {
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(); d.setMonth(d.getMonth() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const total = usage.filter(u => u.timestamp.startsWith(key)).reduce((s, u) => s + (u.cost || 0), 0);
+    const translate = usage.filter(u => u.timestamp.startsWith(key) && (u.action === 'translate' || u.action === 'both')).length;
+    const clean = usage.filter(u => u.timestamp.startsWith(key) && (u.action === 'clean' || u.action === 'both')).length;
+    months.push({ month: key, cost: parseFloat(total.toFixed(2)), translate, clean });
+  }
+  return months;
+}
+
+// ── Batch execute (async, with progress) ──
+app.post('/api/batch/execute', authRequired, executeLimiter, async (req, res) => {
+  try {
+    const { action, records, fields, sourceLang, targetLang, cleaningInstruction } = req.body;
+    if (!records || !records.length) return res.status(400).json({ error: 'No records' });
+
+    const BATCH_SIZE = 10;
+    const jobId = createBatchJob(req.userId, action, records, fields, { sourceLang, targetLang, cleaningInstruction });
+    res.json({ jobId, totalRecords: records.length, totalBatches: Math.ceil(records.length / BATCH_SIZE) });
+
+    // Process in background
+    processBatchJob(jobId, req.userId, action, records, fields, BATCH_SIZE, { sourceLang, targetLang, cleaningInstruction });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+async function processBatchJob(jobId, userId, action, records, fields, batchSize, opts) {
+  const job = batchJobs[jobId];
+  if (!job) return;
+  job.status = 'running';
+
+  const users = readJSON(USERS_FILE);
+  const user = users[userId];
+
+  for (let i = 0; i < records.length; i += batchSize) {
+    const batch = records.slice(i, i + batchSize);
+
+    try {
+      // Estimate + check balance
+      let estCost = 0;
+      if (action === 'translate' || action === 'both') {
+        let chars = 0;
+        batch.forEach(r => fields.forEach(f => { if (r[f] && typeof r[f] === 'string') chars += r[f].length; }));
+        estCost += (chars / 1_000_000) * PRICE_TRANSLATION_PER_M;
+      }
+      if (action === 'clean' || action === 'both') {
+        let tokens = 0;
+        batch.forEach(r => fields.forEach(f => { if (r[f] && typeof r[f] === 'string') tokens += estimateTokens(r[f]); }));
+        tokens = Math.ceil(tokens * 1.2);
+        estCost += (tokens / 1000) * PRICE_CLEAN_PER_1K_TOKENS;
+      }
+      const batchCost = parseFloat(Math.max(estCost, 0.01).toFixed(4));
+
+      if (user.balance < batchCost) {
+        job.status = 'failed'; job.error = '余额不足';
+        return;
+      }
+
+      const results = { cleaned: {}, translated: {} };
+
+      if (action === 'translate' || action === 'both') {
+        const texts = [], textMap = [];
+        batch.forEach((r, ri) => fields.forEach(f => { if (r[f] && typeof r[f] === 'string') { texts.push(r[f]); textMap.push({ ri: i + ri, f }); } }));
+        if (texts.length > 0) {
+          const translated = TRANSLATION_BACKEND === 'deepl'
+            ? await translateWithDeepL(texts, opts.sourceLang || 'auto', opts.targetLang || 'ZH')
+            : TRANSLATION_BACKEND !== 'mock'
+              ? await translateWithLLM(texts, opts.targetLang || 'ZH')
+              : await mockTranslate(texts, opts.targetLang || 'ZH');
+          translated.forEach((t, idx) => { const { ri, f } = textMap[idx]; if (!job.results.translated[ri]) job.results.translated[ri] = {}; job.results.translated[ri][f] = t; });
+        }
+      }
+
+      if (action === 'clean' || action === 'both') {
+        const r = DEMO_MODE
+          ? await mockClean(batch, opts.cleaningInstruction || 'Clean data')
+          : await cleanWithLLM(batch, opts.cleaningInstruction || 'Clean data', fields);
+        r.cleaned.forEach((c, idx) => { const ri = i + idx; if (!job.results.cleaned[ri]) job.results.cleaned[ri] = {}; Object.assign(job.results.cleaned[ri], c); });
+      }
+
+      user.balance = parseFloat((user.balance - batchCost).toFixed(4));
+      user.dailySpend = parseFloat(((user.dailySpend || 0) + batchCost).toFixed(4));
+      user.monthlySpend = parseFloat(((user.monthlySpend || 0) + batchCost).toFixed(4));
+      job.totalCost = parseFloat((job.totalCost + batchCost).toFixed(4));
+
+      writeJSON(USERS_FILE, users);
+
+      const usage = readJSON(USAGE_FILE);
+      usage.push({ userId, action: 'batch_' + action, details: { batch: job.completedBatches + 1, records: batch.length }, cost: batchCost, timestamp: new Date().toISOString() });
+      writeJSON(USAGE_FILE, usage);
+    } catch (err) {
+      job.status = 'failed'; job.error = err.message;
+      return;
+    }
+
+    job.completedBatches++;
+    job.progress = Math.round((job.completedBatches / job.totalBatches) * 100);
+  }
+
+  job.status = 'completed';
+}
+
+app.get('/api/batch/:jobId', authRequired, (req, res) => {
+  const job = batchJobs[req.params.jobId];
+  if (!job) return res.status(404).json({ error: '任务不存在' });
+  if (job.userId !== req.userId) return res.status(403).json({ error: '无权访问' });
+  res.json({
+    jobId: job.jobId, status: job.status, progress: job.progress,
+    totalBatches: job.totalBatches, completedBatches: job.completedBatches,
+    totalCost: job.totalCost, error: job.error,
+    results: job.status === 'completed' ? job.results : null
+  });
 });
 
 // ═══════════════ Demo Mode (no login, 5 free per type) ═══════════════
@@ -714,6 +890,117 @@ app.post('/api/demo/execute', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ═══════════════ Admin Panel ═══════════════
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+
+function adminAuth(req, res, next) {
+  if ((req.headers['x-admin-token'] || '') === ADMIN_PASSWORD) return next();
+  res.status(401).json({ error: '管理员密码错误' });
+}
+
+app.get('/api/admin/stats', adminAuth, (req, res) => {
+  const users = readJSON(USERS_FILE);
+  const usage = readJSON(USAGE_FILE);
+  const userList = Object.values(users);
+  const now = new Date();
+  const thisMonth = usage.filter(u => { const d=new Date(u.timestamp); return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear(); });
+  const rev = parseFloat(thisMonth.reduce((s,u)=>s+(u.cost||0),0).toFixed(2));
+  const wholesale = parseFloat(thisMonth.reduce((s,u)=>s+(u.wholesaleCost||0),0).toFixed(2));
+  const activeIds = [...new Set(usage.filter(u=>(now-new Date(u.timestamp))<7*86400000).map(u=>u.userId))];
+  res.json({
+    totalUsers: userList.length, verifiedUsers: userList.filter(u=>u.emailVerified).length, activeThisWeek: activeIds.length,
+    monthlyRevenue: rev, monthlyWholesale: wholesale, monthlyProfit: parseFloat((rev-wholesale).toFixed(2)),
+    margin: rev>0?Math.round((rev-wholesale)/rev*100):0,
+    totalBalance: parseFloat(userList.reduce((s,u)=>s+(u.balance||0),0).toFixed(2)),
+    topUsers: userList.sort((a,b)=>(b.balance||0)-(a.balance||0)).slice(0,10).map(u=>({id:u.id,email:u.email,balance:u.balance,emailVerified:u.emailVerified}))
+  });
+});
+
+// ═══════════════ Referral System ═══════════════
+function generateRefCode() { return 'r_'+Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,5); }
+
+// Patch referral codes into existing users (lazy init)
+const _origGetUser = (id) => {
+  const users = readJSON(USERS_FILE);
+  const user = users[id];
+  if (user && !user.referralCode) { user.referralCode = generateRefCode(); writeJSON(USERS_FILE, users); }
+  return user;
+};
+
+app.get('/api/users/me/referral', authRequired, (req, res) => {
+  const users = readJSON(USERS_FILE);
+  const user = users[req.userId];
+  if (!user) return res.status(404).json({ error: '用户不存在' });
+  if (!user.referralCode) { user.referralCode = generateRefCode(); writeJSON(USERS_FILE, users); }
+  const usage = readJSON(USAGE_FILE);
+  const earned = parseFloat(usage.filter(u=>u.action==='referral_bonus'&&u.userId===req.userId).reduce((s,u)=>s+(u.cost||0),0).toFixed(2));
+  const referred = Object.values(users).filter(u=>u.referredBy===user.referralCode).length;
+  res.json({ referralCode: user.referralCode, referralLink: 'https://databridge.app?ref='+user.referralCode, totalEarned: earned, referredCount: referred });
+});
+
+// ═══════════════ Template Marketplace ═══════════════
+const TEMPLATES_FILE = path.join(DATA_DIR, 'templates.json');
+if (!fs.existsSync(TEMPLATES_FILE)) fs.writeFileSync(TEMPLATES_FILE, JSON.stringify([
+  { id:'tpl_clean', name:'通用数据清洗', author:'DataBridge', category:'clean', desc:'去空格 · 公司名标准化 · 邮箱修复', rules:{action:'clean',instruction:'去除首尾多余空格，统一公司后缀格式，修复错误邮箱'}, downloads:128, featured:true },
+  { id:'tpl_trans', name:'英文→中文翻译', author:'DataBridge', category:'translate', desc:'产品描述翻译，保留技术术语', rules:{action:'translate',sourceLang:'EN',targetLang:'ZH'}, downloads:95, featured:true },
+  { id:'tpl_crm', name:'CRM 数据标准化', author:'DataBridge', category:'both', desc:'清洗+翻译：公司名、职位、地址', rules:{action:'both',instruction:'去除空格，标准化公司名，翻译英文内容',sourceLang:'EN',targetLang:'ZH'}, downloads:67, featured:false },
+  { id:'tpl_ecom', name:'电商产品处理', author:'DataBridge', category:'both', desc:'清洗SKU，翻译产品标题和描述', rules:{action:'both',instruction:'标准化SKU格式',sourceLang:'EN',targetLang:'ZH'}, downloads:42, featured:false }
+], null, 2));
+
+app.get('/api/templates', (req, res) => {
+  const tpls = readJSON(TEMPLATES_FILE);
+  res.json({ templates: tpls, featured: tpls.filter(t=>t.featured) });
+});
+
+app.post('/api/templates', authRequired, (req, res) => {
+  const { name, desc, rules, category } = req.body;
+  if (!name||!rules) return res.status(400).json({ error: '名称和规则不能为空' });
+  const tpls = readJSON(TEMPLATES_FILE);
+  const tpl = { id:'tpl_'+Date.now().toString(36), name, desc:desc||'', category:category||'clean', author:req.userEmail, rules, downloads:0, featured:false, createdAt:new Date().toISOString() };
+  tpls.push(tpl); writeJSON(TEMPLATES_FILE, tpls);
+  res.status(201).json(tpl);
+});
+
+// ═══════════════ Airtable Script ═══════════════
+app.get('/api/airtable-script', (req, res) => {
+  const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+  res.json({
+    script: `// DataBridge Airtable Scripting Extension\n// 在 Airtable Base → Extensions → Scripting 中粘贴此代码\n\nconst TOKEN = 'YOUR_DATABRIDGE_TOKEN';\nconst API = '${baseUrl}';\nconst TABLE = await input.tableAsync('选择表:');\nconst FIELD = await input.fieldAsync('选择要翻译的字段:', TABLE);\nconst LANG = await input.buttonsAsync('目标语言:', ['中文','English','日本語']);\nconst query = await TABLE.selectRecordsAsync();\nconst records = query.records.filter(r => r.getCellValue(FIELD));\nconst texts = records.map(r => r.getCellValueAsString(FIELD));\nconst resp = await fetch(API+'/api/execute', {\n  method:'POST',\n  headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},\n  body:JSON.stringify({action:'translate',records:texts.map((t,i)=>({id:records[i].id,[FIELD.name]:t})),fields:[FIELD.name],targetLang:LANG==='中文'?'ZH':LANG==='日本語'?'JA':'EN'})\n});\nconst data = await resp.json();\nif(data.success){\n  const updates = records.map((r,i)=>({id:r.id,fields:{[FIELD.name+' (翻译)']:data.results.translated[i]?.[FIELD.name]||''}}));\n  while(updates.length) await TABLE.updateRecordsAsync(updates.splice(0,50));\n  output.markdown('✅ 已翻译 '+records.length+' 条记录');\n}else{output.markdown('❌ '+JSON.stringify(data))}`,
+    instructions: ['1. Airtable Base → Extensions → 添加 Scripting','2. 粘贴脚本代码','3. 登录 DataBridge → F12 → Application → Local Storage → 复制 databridge_token','4. 替换 YOUR_DATABRIDGE_TOKEN','5. 点击 Run']
+  });
+});
+
+// ── Admin page ──
+app.get('/admin', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>DataBridge 管理面板</title>
+<style>body{font-family:-apple-system,system-ui,sans-serif;max-width:900px;margin:24px auto;padding:0 20px;color:#111827;background:#f8f9fb}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px;margin-bottom:16px}
+h2{font-size:18px;margin-bottom:12px}.stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6}
+.stat .val{font-weight:700}.green{color:#059669}.red{color:#dc2626}
+table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f9fafb;padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb}
+td{padding:7px 12px;border-bottom:1px solid #f3f4f6}
+input{padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;margin-right:8px}
+button{padding:8px 16px;background:#4f46e5;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px}
+#login-box{text-align:center;padding:60px 0}#stats-area{display:none}</style></head><body>
+<div id="login-box"><h2>🔐 管理员登录</h2><input type="password" id="pwd" placeholder="管理员密码"><button onclick="login()">登录</button></div>
+<div id="stats-area"><h2>📊 DataBridge 管理面板</h2><div id="cards"></div><h3>👥 Top 10 用户</h3><table id="users"><thead><tr><th>ID</th><th>邮箱</th><th>余额</th><th>已验证</th></tr></thead><tbody></tbody></table></div>
+<script>
+let token='';
+function login(){token=document.getElementById('pwd').value;load();}
+async function load(){
+  const r=await fetch('/api/admin/stats',{headers:{'x-admin-token':token}});
+  if(!r.ok){alert('密码错误');return}
+  const d=await r.json();
+  document.getElementById('login-box').style.display='none';
+  document.getElementById('stats-area').style.display='';
+  document.getElementById('cards').innerHTML=
+    '<div class="card"><h3>概览</h3>'+['总用户:'+d.totalUsers,'已验证:'+d.verifiedUsers,'本周活跃:'+d.activeThisWeek,'总余额:$'+d.totalBalance].map(s=>'<div class="stat"><span>'+s.split(':')[0]+'</span><span class="val">'+s.split(':')[1]+'</span></div>').join('')+'</div>'+
+    '<div class="card"><h3>本月财务</h3>'+['收入:$'+d.monthlyRevenue,'成本:$'+d.monthlyWholesale,'利润:$'+d.monthlyProfit,'利润率:'+d.margin+'%'].map(s=>'<div class="stat"><span>'+s.split(':')[0]+'</span><span class="val '+(s.includes('利润')?'green':'')+'">'+s.split(':')[1]+'</span></div>').join('')+'</div>';
+  document.getElementById('users').querySelector('tbody').innerHTML=d.topUsers.map(u=>'<tr><td>'+u.id+'</td><td>'+u.email+'</td><td>$'+(u.balance||0).toFixed(2)+'</td><td>'+(u.emailVerified?'✅':'❌')+'</td></tr>').join('');
+}
+</script></body></html>`);
 });
 
 // ── Legal pages ──

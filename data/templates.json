@@ -1,0 +1,59 @@
+[
+  {
+    "id": "tpl_clean",
+    "name": "通用数据清洗",
+    "author": "DataBridge",
+    "category": "clean",
+    "desc": "去空格 · 公司名标准化 · 邮箱修复",
+    "rules": {
+      "action": "clean",
+      "instruction": "去除首尾多余空格，统一公司后缀格式，修复错误邮箱"
+    },
+    "downloads": 128,
+    "featured": true
+  },
+  {
+    "id": "tpl_trans",
+    "name": "英文→中文翻译",
+    "author": "DataBridge",
+    "category": "translate",
+    "desc": "产品描述翻译，保留技术术语",
+    "rules": {
+      "action": "translate",
+      "sourceLang": "EN",
+      "targetLang": "ZH"
+    },
+    "downloads": 95,
+    "featured": true
+  },
+  {
+    "id": "tpl_crm",
+    "name": "CRM 数据标准化",
+    "author": "DataBridge",
+    "category": "both",
+    "desc": "清洗+翻译：公司名、职位、地址",
+    "rules": {
+      "action": "both",
+      "instruction": "去除空格，标准化公司名，翻译英文内容",
+      "sourceLang": "EN",
+      "targetLang": "ZH"
+    },
+    "downloads": 67,
+    "featured": false
+  },
+  {
+    "id": "tpl_ecom",
+    "name": "电商产品处理",
+    "author": "DataBridge",
+    "category": "both",
+    "desc": "清洗SKU，翻译产品标题和描述",
+    "rules": {
+      "action": "both",
+      "instruction": "标准化SKU格式",
+      "sourceLang": "EN",
+      "targetLang": "ZH"
+    },
+    "downloads": 42,
+    "featured": false
+  }
+]

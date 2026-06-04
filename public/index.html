@@ -35,6 +35,18 @@ main{max-width:1200px;margin:0 auto;padding:24px}
 .btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent-hover)}
 .btn-outline{background:var(--surface);border-color:var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
 .btn-danger{background:var(--red-bg);color:var(--red);border-color:#fecaca}
+.chart-bar{display:flex;align-items:end;gap:4px;height:120px;padding:0 8px}
+.chart-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.chart-fill{width:100%;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px;transition:height .5s}
+.chart-fill.trans{background:var(--purple)}.chart-fill.clean{background:var(--green)}
+.chart-label{font-size:10px;color:var(--muted)}
+.progress-wrap{background:var(--bg);border-radius:20px;height:8px;margin:8px 0;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:20px;transition:width .3s}
+.diff-highlight{background:#fef3c7;padding:1px 3px;border-radius:2px}
+.diff-added{background:#d1fae5;padding:2px 4px;border-radius:2px;font-weight:600}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+.stat-mini{background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;text-align:center}
+.stat-mini .val{font-size:22px;font-weight:800}.stat-mini .lbl{font-size:11px;color:var(--muted)}
 .btn-sm{padding:5px 10px;font-size:11px}.btn:disabled{opacity:.5;cursor:not-allowed}
 .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .chip{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .15s}
@@ -73,6 +85,9 @@ tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.resul
     <span id="user-email"></span>
     <span class="status-badge off" id="conn-status">⚡ 未连接</span>
     <span class="bal-badge" id="bal-badge" onclick="showTopupModal()">💎 $0.00</span>
+    <button class="btn btn-sm btn-outline hidden" id="btn-dashboard" onclick="toggleDashboard()">📊 用量</button>
+    <button class="btn btn-sm btn-outline hidden" id="btn-templates" onclick="toggleTemplates()">🧩 模板</button>
+    <button class="btn btn-sm btn-outline hidden" id="btn-script" onclick="showAirtableScript()">📜 Airtable脚本</button>
     <button class="btn btn-sm btn-outline hidden" id="btn-logout" onclick="logout()">退出</button>
   </div>
 </header>
@@ -185,18 +200,66 @@ tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.resul
         </div>
       </div>
       <button class="btn btn-primary" onclick="estimateAndExecute('both')" style="background:#7c3aed">⚡ 一键清洗+翻译</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:12px;cursor:pointer;">
+        <input type="checkbox" id="batch-mode"> 🔄 批量模式（500+ 行后台处理，带进度）
+      </label>
     </div>
 
     <!-- Results -->
     <div class="card hidden" id="section-results">
       <h3>✅ 执行结果</h3>
       <p class="desc" id="result-desc"></p>
+      <!-- Batch progress -->
+      <div id="batch-progress" class="hidden" style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;"><span>批量处理中...</span><span id="batch-pct">0%</span></div>
+        <div class="progress-wrap"><div class="progress-fill" id="batch-bar" style="width:0%"></div></div>
+        <p style="font-size:11px;color:var(--muted);" id="batch-status"></p>
+      </div>
       <div class="table-wrap" id="result-table-container"></div>
       <div class="status-msg" id="status-results"></div>
       <div class="form-row" style="margin-top:12px">
         <div class="form-group"><label>写入模式</label><select id="write-mode"><option value="new_column">新建列 (推荐)</option><option value="overwrite">覆盖原列</option></select></div>
         <button class="btn btn-primary" onclick="writeBack()">✅ 写回 Airtable</button>
       </div>
+    </div>
+
+    <!-- Usage Dashboard -->
+    <div class="card hidden" id="section-dashboard">
+      <h3>📊 用量仪表盘</h3>
+      <div class="stat-grid" id="dash-stats"></div>
+      <h4 style="margin:16px 0 8px;">📈 近 6 个月消费趋势</h4>
+      <div class="chart-bar" id="dash-chart"></div>
+      <div style="display:flex;gap:12px;margin-top:4px;font-size:10px;color:var(--muted);">
+        <span>🟣 翻译次数</span><span>🟢 清洗次数</span>
+      </div>
+      <h4 style="margin:16px 0 8px;">🔗 推荐好友 · 赚奖励金</h4>
+      <div style="background:var(--purple-bg);border-radius:var(--radius-sm);padding:14px;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span style="font-weight:600;color:#7c3aed;">你的推荐码:</span>
+          <code id="ref-code" style="background:#fff;padding:6px 12px;border-radius:4px;font-size:14px;">加载中...</code>
+          <button class="btn btn-sm btn-primary" onclick="copyRefLink()" style="background:#7c3aed;">📋 复制推荐链接</button>
+        </div>
+        <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;color:var(--muted);">
+          <span id="ref-earned">累计赚取: $0.00</span><span id="ref-count">已推荐: 0 人</span>
+          <span>好友充值你赚 <strong style="color:#7c3aed;">10%</strong></span>
+        </div>
+      </div>
+      <h4 style="margin:16px 0 8px;">📋 最近操作</h4>
+      <div class="table-wrap" style="max-height:240px;"><table id="dash-recent"><thead><tr><th>时间</th><th>操作</th><th>详情</th><th>费用</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <!-- Template Browser -->
+    <div class="card hidden" id="section-templates">
+      <h3>🧩 规则模板市场</h3>
+      <p class="desc">精选清洗和翻译方案，一键应用到工作台</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-outline" onclick="loadTemplates('all')">全部</button>
+        <button class="btn btn-sm btn-outline" onclick="loadTemplates('clean')">🧹 清洗</button>
+        <button class="btn btn-sm btn-outline" onclick="loadTemplates('translate')">🌐 翻译</button>
+        <button class="btn btn-sm btn-outline" onclick="loadTemplates('both')">⚡ 清洗+翻译</button>
+        <button class="btn btn-sm btn-primary" onclick="showSaveTemplate()" style="margin-left:auto;">💾 保存当前规则</button>
+      </div>
+      <div id="template-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;"></div>
     </div>
   </div>
 </main>
@@ -339,6 +402,9 @@ async function onAuthSuccess() {
   document.getElementById('section-auth').classList.add('hidden');
   document.getElementById('app-sections').classList.remove('hidden');
   document.getElementById('btn-logout').classList.remove('hidden');
+  document.getElementById('btn-dashboard').classList.remove('hidden');
+  document.getElementById('btn-templates').classList.remove('hidden');
+  document.getElementById('btn-script').classList.remove('hidden');
   document.getElementById('btn-logout').textContent = '退出';
   document.getElementById('btn-logout').onclick = logout;
   document.getElementById('user-email').textContent = '👤 '+user.email;
@@ -742,6 +808,212 @@ function showTopupModal() { document.getElementById('modal-topup').classList.rem
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 function showStatus(id,msg,type) { const el=document.getElementById(id); el.textContent=msg; el.className='status-msg'+(msg?' show '+type:''); }
 function toast(msg,type) { const c=document.getElementById('toast-container'); const el=document.createElement('div'); el.className='toast '+(type||''); el.textContent=msg; c.appendChild(el); setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s'},3000); setTimeout(()=>el.remove(),3500); }
+
+// ── Dashboard ──
+async function toggleDashboard() {
+  const dash = document.getElementById('section-dashboard');
+  if (!dash.classList.contains('hidden')) { dash.classList.add('hidden'); return; }
+  dash.classList.remove('hidden');
+  document.getElementById('section-results').classList.add('hidden');
+  document.getElementById('section-templates').classList.add('hidden');
+  await loadDashboard();
+  loadReferral();
+}
+
+async function loadReferral() {
+  try {
+    const res = await api('/api/users/me/referral');
+    if (!res.ok) return;
+    const d = await res.json();
+    document.getElementById('ref-code').textContent = d.referralCode;
+    document.getElementById('ref-earned').textContent = '累计赚取: $'+d.totalEarned.toFixed(2);
+    document.getElementById('ref-count').textContent = '已推荐: '+d.referredCount+' 人';
+  } catch(e) {}
+}
+
+function copyRefLink() {
+  const code = document.getElementById('ref-code').textContent;
+  const link = 'https://databridge.app?ref='+code;
+  navigator.clipboard?.writeText(link);
+  toast('📋 推荐链接已复制！好友通过此链接注册充值，你赚 10%', 'success');
+}
+
+// ── Templates ──
+async function toggleTemplates() {
+  const sec = document.getElementById('section-templates');
+  if (!sec.classList.contains('hidden')) { sec.classList.add('hidden'); return; }
+  sec.classList.remove('hidden');
+  document.getElementById('section-dashboard').classList.add('hidden');
+  document.getElementById('section-results').classList.add('hidden');
+  await loadTemplates('all');
+}
+
+async function loadTemplates(cat) {
+  try {
+    const url = cat === 'all' ? '/api/templates' : '/api/templates?category='+cat;
+    const res = await fetch(url);
+    const d = await res.json();
+    document.getElementById('template-list').innerHTML = d.templates.map(t => `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;${t.featured?'border-color:#7c3aed;':''}">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+          <strong>${t.featured?'⭐ ':''}${t.name}</strong>
+          <span style="font-size:10px;color:var(--muted);">${t.downloads} 次使用</span>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin:8px 0;">${t.desc}</p>
+        <div style="display:flex;gap:6px;">
+          <span style="font-size:10px;background:var(--bg);padding:2px 8px;border-radius:10px;">${t.category==='translate'?'🌐翻译':t.category==='clean'?'🧹清洗':'⚡清洗+翻译'}</span>
+          <span style="font-size:10px;background:var(--bg);padding:2px 8px;border-radius:10px;">by ${t.author}</span>
+        </div>
+        <button class="btn btn-sm btn-primary" style="margin-top:8px;width:100%;" onclick="applyTemplate('${t.id}')">应用此方案</button>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+function applyTemplate(id) {
+  toast('✅ 模板已应用！请到工作台选择数据执行', 'success');
+  document.getElementById('section-templates').classList.add('hidden');
+}
+
+function showSaveTemplate() {
+  const name = prompt('模板名称:');
+  if (!name) return;
+  const desc = prompt('简短描述:') || '';
+  const instr = document.getElementById('clean-instruction').value || 'Clean data';
+  const action = state.pendingAction || 'clean';
+  api('/api/templates', { method:'POST', body:JSON.stringify({name, desc, rules:{action, instruction:instr}, category:action}) })
+    .then(r => r.ok ? toast('✅ 模板已发布到市场！','success') : r.json().then(d => toast('❌ '+d.error,'error')));
+}
+
+// ── Airtable Script ──
+function showAirtableScript() {
+  fetch('/api/airtable-script').then(r=>r.json()).then(d => {
+    const w = window.open('','_blank','width=700,height=500');
+    w.document.write(`<html><head><title>Airtable Script</title><style>body{font-family:monospace;padding:20px;background:#1a1a2e;color:#a0a0b0;line-height:1.6}pre{background:#0d1117;padding:16px;border-radius:8px;overflow:auto;font-size:12px}h2{color:#fff}ol li{margin:8px 0}</style></head><body><h2>📜 Airtable Scripting Extension</h2><ol>${d.instructions.map(i=>'<li>'+i+'</li>').join('')}</ol><h2>脚本代码</h2><pre>${d.script.replace(/</g,'&lt;')}</pre><button onclick="navigator.clipboard.writeText(document.querySelector('pre').textContent);alert('已复制')" style="padding:8px 16px;margin-top:8px;">📋 复制代码</button></body></html>`);
+  });
+}
+
+async function loadDashboard() {
+  try {
+    const res = await api('/api/users/me/usage');
+    if (!res.ok) return;
+    const d = await res.json();
+    // Stats grid
+    document.getElementById('dash-stats').innerHTML = `
+      <div class="stat-mini"><div class="val">$${d.thisMonth}</div><div class="lbl">本月消费</div></div>
+      <div class="stat-mini"><div class="val">$${d.thisWeek}</div><div class="lbl">本周消费</div></div>
+      <div class="stat-mini"><div class="val">$${d.totalSpent}</div><div class="lbl">累计消费</div></div>
+      <div class="stat-mini"><div class="val">${d.translateCount}</div><div class="lbl">翻译次数</div></div>
+      <div class="stat-mini"><div class="val">${d.cleanCount}</div><div class="lbl">清洗次数</div></div>
+      <div class="stat-mini"><div class="val">${d.topupCount}</div><div class="lbl">充值次数</div></div>`;
+    // Chart
+    const maxCost = Math.max(...d.monthlyBreakdown.map(m=>m.cost), 1);
+    document.getElementById('dash-chart').innerHTML = d.monthlyBreakdown.map(m => `
+      <div class="chart-col">
+        <div style="display:flex;gap:2px;width:100%;align-items:end;height:100px;">
+          <div class="chart-fill trans" style="height:${Math.max(m.translate/maxCost*100,2)}%"></div>
+          <div class="chart-fill clean" style="height:${Math.max(m.clean/maxCost*100,2)}%"></div>
+        </div>
+        <span class="chart-label">${m.month.slice(5)}月</span>
+        <span class="chart-label" style="font-weight:600;">$${m.cost}</span>
+      </div>`).join('');
+    // Recent ops
+    document.getElementById('dash-recent').querySelector('tbody').innerHTML = d.recent.slice(0,20).map(u => `
+      <tr>
+        <td>${new Date(u.timestamp).toLocaleString('zh-CN')}</td>
+        <td>${u.action==='translate'?'🌐翻译':u.action==='clean'?'🧹清洗':u.action==='both'?'⚡清洗+翻译':u.action.includes('batch')?'🔄批量'+u.action:'💳充值'}</td>
+        <td style="font-size:11px;color:var(--muted);">${JSON.stringify(u.details).slice(0,40)}</td>
+        <td style="font-weight:600;">$${u.cost.toFixed(4)}</td>
+      </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">暂无操作记录</td></tr>';
+  } catch(e) { /* ignore */ }
+}
+
+// ── Enhanced results with diff highlight ──
+function showDiffResult(orig, newVal) {
+  if (!orig && !newVal) return '<span style="color:var(--muted);">—</span>';
+  if (!orig) return `<span class="diff-added">${escHtml(String(newVal).slice(0,60))}</span>`;
+  if (String(orig) === String(newVal)) return escHtml(String(orig).slice(0,60));
+  // Show old → new with highlight
+  return `<span style="text-decoration:line-through;color:var(--muted);">${escHtml(String(orig).slice(0,30))}</span> → <span class="diff-added">${escHtml(String(newVal).slice(0,30))}</span>`;
+}
+function escHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// Show results function updated with diff
+const origShowResults = showResults;
+showResults = function(data) {
+  origShowResults(data);
+  // Re-render with diff highlighting
+  const fields = state.selectedFields;
+  let html = '<table><thead><tr><th>#</th>'+fields.map(f=>`<th>${f} (对比)</th>`).join('')+'</tr></thead><tbody>';
+  state.records.forEach((r,i)=>{
+    html += '<tr><td>'+(i+1)+'</td>';
+    fields.forEach(f=>{
+      let nv = r[f]||'';
+      if (data.results.cleaned?.[i]?.[f]) nv = data.results.cleaned[i][f];
+      if (data.results.translated?.[i]?.[f]) nv = data.results.translated[i][f];
+      html += `<td style="max-width:400px;white-space:normal;">${showDiffResult(r[f], nv)}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('result-table-container').innerHTML = html;
+};
+
+// ── Batch processing ──
+async function pollBatchJob(jobId) {
+  const bar = document.getElementById('batch-bar');
+  const pct = document.getElementById('batch-pct');
+  const status = document.getElementById('batch-status');
+  document.getElementById('batch-progress').classList.remove('hidden');
+
+  const poll = async () => {
+    try {
+      const res = await api('/api/batch/'+jobId);
+      const job = await res.json();
+      bar.style.width = job.progress+'%';
+      pct.textContent = job.progress+'%';
+      status.textContent = `${job.completedBatches}/${job.totalBatches} 批 · 已消费 $${job.totalCost.toFixed(2)}`;
+
+      if (job.status === 'completed') {
+        state.lastResults = job.results;
+        updateBalance(job.totalCost ? '...' : '');
+        showResults({ cost: job.totalCost, newBalance: 0, backend: LLM_BACKEND, results: job.results });
+        toast(`✅ 批量处理完成！${job.totalBatches} 批，共 $${job.totalCost.toFixed(2)}`, 'success');
+        document.getElementById('batch-progress').classList.add('hidden');
+        return;
+      }
+      if (job.status === 'failed') { toast('❌ 批量处理失败: '+job.error, 'error'); document.getElementById('batch-progress').classList.add('hidden'); return; }
+      setTimeout(poll, 2000);
+    } catch { setTimeout(poll, 3000); }
+  };
+  poll();
+}
+
+// Override estimateAndExecute for batch mode
+const origEstimateAndExecute = estimateAndExecute;
+estimateAndExecute = async function(action) {
+  if (document.getElementById('batch-mode').checked && !isDemo) {
+    if (!state.selectedFields.length) return toast('请选择字段','error');
+    if (!state.records.length) return toast('请加载数据','error');
+    // Use batch endpoint
+    const records = state.records.map(r=>{const o={};state.selectedFields.forEach(f=>{if(r[f]!==undefined)o[f]=r[f]});return o;});
+    try {
+      const res = await api('/api/batch/execute', { method:'POST', body:JSON.stringify({
+        action, records, fields:state.selectedFields,
+        sourceLang:document.getElementById('trans-source').value,
+        targetLang:document.getElementById('trans-target').value,
+        cleaningInstruction:document.getElementById('clean-instruction').value||'Clean data'
+      })});
+      if (!res.ok) throw new Error((await res.json()).error);
+      const { jobId, totalRecords } = await res.json();
+      toast(`🔄 批量处理已启动（${totalRecords} 条）`, 'success');
+      document.getElementById('section-results').classList.remove('hidden');
+      document.getElementById('result-desc').textContent = `批量处理中... ${totalRecords} 条`;
+      pollBatchJob(jobId);
+    } catch(e) { toast('❌ '+e.message,'error'); }
+    return;
+  }
+  return origEstimateAndExecute(action);
+};
 </script>
 </body>
 </html>
