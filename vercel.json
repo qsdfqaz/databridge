@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/serverless.js", "use": "@vercel/node" },
+    { "src": "public/**", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/serverless.js" },
+    { "src": "/terms", "dest": "/api/serverless.js" },
+    { "src": "/privacy", "dest": "/api/serverless.js" },
+    { "src": "/admin", "dest": "/api/serverless.js" },
+    { "src": "/(.*)", "dest": "/public/$1" }
+  ]
+}

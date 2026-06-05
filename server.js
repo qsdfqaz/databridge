@@ -1048,6 +1048,10 @@ if (!hasDS && !hasOAI && !hasDL) {
   console.log('╚══════════════════════════════════════════╝\n');
 }
 
+module.exports = app;
+
+// Only listen when running directly (not on Vercel)
+if (require.main === module) {
 app.listen(PORT, () => {
   console.log(`\n🚀 DataBridge running at http://localhost:${PORT}`);
   if (DEMO_MODE) {
@@ -1064,3 +1068,4 @@ app.listen(PORT, () => {
   console.log(`💳 Stripe: ${stripe ? '✅ configured' : '❌ NOT SET (simulated checkout)'}`);
   console.log(`📧 Email: ${mailer ? '✅ SMTP configured' : '❌ NOT SET (verification skipped)'}`);
 });
+}
