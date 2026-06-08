@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DataBridge — Airtable 智能清洗 & 翻译</title>
+<title>DataBridge — AI Cleaning & Translation for Airtable</title>
+<script src="/i18n.js"></script>
 <style>
 :root {
   --bg:#f8f9fb; --surface:#fff; --border:#e5e7eb; --text:#111827; --muted:#6b7280;
@@ -82,13 +83,15 @@ tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.resul
   <div class="logo"><div class="logo-dot"></div>DataBridge</div>
   <span id="header-base-info" style="font-size:12px;color:var(--muted)"></span>
   <div class="header-right">
+    <button class="btn btn-sm btn-outline" id="btn-lang" onclick="switchLang(currentLang==='zh'?'en':'zh')" title="Switch Language">🌐 EN</button>
     <span id="user-email"></span>
-    <span class="status-badge off" id="conn-status">⚡ 未连接</span>
+    <span class="status-badge off" id="conn-status">Disconnected</span>
     <span class="bal-badge" id="bal-badge" onclick="showTopupModal()">💎 $0.00</span>
-    <button class="btn btn-sm btn-outline hidden" id="btn-dashboard" onclick="toggleDashboard()">📊 用量</button>
-    <button class="btn btn-sm btn-outline hidden" id="btn-templates" onclick="toggleTemplates()">🧩 模板</button>
-    <button class="btn btn-sm btn-outline hidden" id="btn-script" onclick="showAirtableScript()">📜 Airtable脚本</button>
-    <button class="btn btn-sm btn-outline hidden" id="btn-logout" onclick="logout()">退出</button>
+    <button class="btn btn-sm btn-outline hidden" id="btn-dashboard" onclick="toggleDashboard()">📊 Usage</button>
+    <button class="btn btn-sm btn-outline hidden" id="btn-templates" onclick="toggleTemplates()">🧩 Templates</button>
+    <button class="btn btn-sm btn-outline hidden" id="btn-script" onclick="showAirtableScript()">📜 Script</button>
+    <button class="btn btn-sm btn-outline hidden" id="btn-logout" onclick="logout()">Logout</button>
+    <button class="btn btn-sm btn-outline hidden" id="btn-change-pwd" onclick="showChangePassword()" style="font-size:11px;">🔑</button>
   </div>
 </header>
 
@@ -96,83 +99,87 @@ tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.resul
   <!-- Auth Card -->
   <div class="card" id="section-auth">
     <div class="auth-tabs">
-      <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">登录</button>
-      <button class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">注册</button>
+      <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Login</button>
+      <button class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Register</button>
     </div>
 
     <div id="form-login">
       <div class="form-row">
-        <div class="form-group" style="flex:1"><label>邮箱</label><input type="email" id="login-email" placeholder="your@email.com"></div>
+        <div class="form-group" style="flex:1"><label>Email</label><input type="email" id="login-email" placeholder="your@email.com"></div>
       </div>
       <div class="form-row">
-        <div class="form-group" style="flex:1"><label>密码</label><input type="password" id="login-password" placeholder="至少6位"></div>
+        <div class="form-group" style="flex:1"><label>Password</label><input type="password" id="login-password" placeholder="6+ characters"></div>
       </div>
-      <button class="btn btn-primary" onclick="doLogin()">登录</button>
+      <button class="btn btn-primary" onclick="doLogin()">Login</button>
+      <p style="margin-top:10px;font-size:12px;">
+        <a href="#" onclick="showForgotPassword()" style="color:var(--accent);">Forgot password?</a>
+      </p>
     </div>
 
     <div id="form-register" class="hidden">
       <div class="form-row">
-        <div class="form-group" style="flex:1"><label>邮箱</label><input type="email" id="reg-email" placeholder="your@email.com"></div>
+        <div class="form-group" style="flex:1"><label>Email</label><input type="email" id="reg-email" placeholder="your@email.com"></div>
       </div>
       <div class="form-row">
-        <div class="form-group" style="flex:1"><label>密码</label><input type="password" id="reg-password" placeholder="至少6位"></div>
+        <div class="form-group" style="flex:1"><label>Password</label><input type="password" id="reg-password" placeholder="6+ characters"></div>
       </div>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:12px;">
         <input type="checkbox" id="reg-terms" onchange="document.getElementById('btn-register').disabled=!this.checked">
-        我已阅读并同意 <a href="/terms" target="_blank" style="color:var(--accent);">服务条款</a> 和 <a href="/privacy" target="_blank" style="color:var(--accent);">隐私政策</a>
+        I agree to the <a href="/terms" target="_blank" style="color:var(--accent);">Terms</a> and <a href="/privacy" target="_blank" style="color:var(--accent);">Privacy Policy</a>
       </label>
-      <button class="btn btn-primary" onclick="doRegister()" id="btn-register" disabled>注册</button>
+      <button class="btn btn-primary" onclick="doRegister()" id="btn-register" disabled>Register</button>
     </div>
-    <p style="font-size:11px;color:var(--muted);margin-top:12px;">🔐 注册需要邮箱验证。密码加密存储。</p>
+    <p style="font-size:11px;color:var(--muted);margin-top:12px;">Your password is encrypted. Email verification required.</p>
+    <p style="font-size:11px;color:var(--green);margin-top:4px;">Your Airtable PAT stays in your browser — never uploaded to our server.</p>
 
     <div style="margin-top:20px; padding-top:20px; border-top:1px solid var(--border); text-align:center;">
-      <p style="font-size:13px; color:var(--muted); margin-bottom:10px;">不想注册？先试试看效果</p>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:10px;">Not ready to sign up? Try the demo first</p>
       <button class="btn btn-primary" onclick="startDemo()" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);font-size:15px;padding:12px 28px;">
-        🎮 体验演示（免费 5 次）
+        🎮 Live Demo (3 Free)
       </button>
-      <p style="font-size:11px;color:var(--muted);margin-top:8px;">使用示例数据 · 翻译和清洗各 5 次免费 · 无需注册</p>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px;">Sample data · 3 free translations & cleanings · No registration</p>
     </div>
   </div>
 
   <!-- Email verification banner (shown when not verified) -->
   <div id="verify-banner" class="card hidden" style="text-align:center;background:#fffbeb;border-color:var(--orange);">
-    <strong style="color:var(--orange);">⚠️ 邮箱未验证</strong>
-    <span style="font-size:13px;color:var(--muted);margin-left:8px;">充值和使用服务需要先验证邮箱</span>
+    <strong style="color:var(--orange);">⚠️ Email not verified</strong>
+    <span style="font-size:13px;color:var(--muted);margin-left:8px;">Verify your email to top up and use the service</span>
     <div class="form-row" style="justify-content:center;margin-top:8px;">
-      <button class="btn btn-sm btn-outline" onclick="sendVerifyCode()" id="btn-send-code">发送验证码</button>
-      <input type="text" id="input-verify-code" placeholder="6位验证码" style="width:110px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;">
-      <button class="btn btn-sm btn-primary" onclick="verifyEmail()">验证</button>
+      <button class="btn btn-sm btn-outline" onclick="sendVerifyCode()" id="btn-send-code">Send Code</button>
+      <input type="text" id="input-verify-code" placeholder="6-digit code" style="width:110px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;">
+      <button class="btn btn-sm btn-primary" onclick="verifyEmail()">Verify</button>
     </div>
   </div>
 
   <!-- Demo Banner (shown during demo) -->
   <div id="demo-banner" class="card hidden" style="text-align:center;background:linear-gradient(135deg,#f5f3ff,#eef2ff);border-color:#7c3aed;">
     <span style="font-size:20px;">🎮</span>
-    <strong style="color:#7c3aed;">演示模式</strong>
-    <span style="font-size:13px;color:var(--muted);margin-left:8px;">使用示例数据 · 免费体验 · <span id="demo-counter">翻译 5/5 · 清洗 5/5</span></span>
+    <strong style="color:#7c3aed;">Demo Mode</strong>
+    <span style="font-size:13px;color:var(--muted);margin-left:8px;">Sample data · Free trial · <span id="demo-counter">Translate 0/3 · Clean 0/3</span></span>
   </div>
 
   <!-- App sections (hidden until auth/demo) -->
   <div id="app-sections" class="hidden">
     <!-- Connect -->
     <div class="card" id="section-connect">
-      <h3>🔗 连接 Airtable</h3>
-      <p class="desc">输入 Airtable PAT 和 Base ID</p>
+      <h3>Connect Airtable</h3>
+      <p class="desc">Enter your Airtable PAT and Base ID to get started</p>
       <div class="form-row">
         <div class="form-group" style="flex:1;min-width:240px"><label>Airtable PAT</label><input type="password" id="input-pat" placeholder="pat..."></div>
         <div class="form-group" style="flex:1;min-width:180px"><label>Base ID</label><input type="text" id="input-base" placeholder="app..."></div>
-        <div class="form-group" style="justify-content:end"><button class="btn btn-primary" id="btn-connect" onclick="connectAirtable()">连接</button></div>
+        <div class="form-group" style="justify-content:end"><button class="btn btn-primary" id="btn-connect" onclick="connectAirtable()">Connect</button></div>
       </div>
-      <p style="font-size:11px;color:var(--muted)">在 <a href="https://airtable.com/create/tokens" target="_blank" style="color:var(--accent)">airtable.com/create/tokens</a> 创建 PAT，需要 data.records:read + data.records:write + schema.bases:read</p>
+      <p style="font-size:11px;color:var(--muted)">Create a PAT at <a href="https://airtable.com/create/tokens" target="_blank" style="color:var(--accent)">airtable.com/create/tokens</a> with scopes: data.records:read + data.records:write + schema.bases:read</p>
     </div>
 
     <!-- Table -->
     <div class="card hidden" id="section-table">
-      <h3>📋 选择 Table & 字段</h3>
+      <h3>📋 Select Table & Fields</h3>
       <div class="form-row">
-        <div class="form-group"><label>Table</label><select id="select-table" onchange="loadFields()"><option>-- 先连接 --</option></select></div>
-        <div class="form-group"><label>行数</label><select id="select-max-rows"><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option></select></div>
-        <div style="display:flex;align-items:end"><button class="btn btn-outline" onclick="loadRecords()">📥 加载数据</button></div>
+        <div class="form-group"><label>Table</label><select id="select-table" onchange="loadFields()"><option>-- Connect first --</option></select></div>
+        <div class="form-group"><label>Rows</label><select id="select-max-rows"><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option></select></div>
+        <div style="display:flex;align-items:end"><button class="btn btn-outline" onclick="loadRecords()">📥 Load Records</button></div>
       </div>
       <div id="field-chips" class="chip-row"></div>
       <div class="status-msg" id="status-records"></div>
@@ -182,32 +189,32 @@ tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.resul
 
     <!-- Operations -->
     <div class="card hidden" id="section-ops">
-      <h3>⚡ 操作</h3>
-      <p class="desc" style="font-size:12px;">💰 翻译 <strong>$2/百万字符</strong>（约￥1/50万字）· 清洗 <strong>$0.40/千token</strong>（约 500 条短文本仅 $0.1）· DeepSeek 驱动</p>
+      <h3>⚡ Actions</h3>
+      <p class="desc" style="font-size:12px;">💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · Powered by DeepSeek</p>
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px">
-        <h4 style="margin-bottom:6px">🌐 翻译</h4>
+        <h4 style="margin-bottom:6px">🌐 Translate</h4>
         <div class="form-row">
-          <div class="form-group"><label>源语言</label><select id="trans-source"><option value="">自动检测</option><option value="EN">英语</option><option value="ZH">中文</option><option value="JA">日语</option></select></div>
-          <div class="form-group"><label>目标语言</label><select id="trans-target"><option value="ZH">简体中文</option><option value="EN">英语</option><option value="JA">日语</option></select></div>
-          <button class="btn btn-primary" onclick="estimateAndExecute('translate')">🌐 翻译</button>
+          <div class="form-group"><label>Source</label><select id="trans-source"><option value="">Auto Detect</option><option value="EN">English</option><option value="ZH">Chinese</option><option value="JA">Japanese</option></select></div>
+          <div class="form-group"><label>Target</label><select id="trans-target"><option value="ZH">Chinese</option><option value="EN">English</option><option value="JA">Japanese</option></select></div>
+          <button class="btn btn-primary" onclick="estimateAndExecute('translate')">🌐 Translate</button>
         </div>
       </div>
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px">
-        <h4 style="margin-bottom:6px">🧹 智能清洗</h4>
+        <h4 style="margin-bottom:6px">🧹 Clean</h4>
         <div class="form-row">
-          <div class="form-group" style="flex:1"><label>清洗指令</label><input type="text" id="clean-instruction" placeholder="去空格、标准化公司名、标记空值..." style="width:100%"></div>
-          <button class="btn btn-primary" onclick="estimateAndExecute('clean')">🧹 清洗</button>
+          <div class="form-group" style="flex:1"><label>Instruction</label><input type="text" id="clean-instruction" placeholder="e.g. Remove spaces, standardize names, mark empty..." style="width:100%"></div>
+          <button class="btn btn-primary" onclick="estimateAndExecute('clean')">🧹 Clean</button>
         </div>
       </div>
-      <button class="btn btn-primary" onclick="estimateAndExecute('both')" style="background:#7c3aed">⚡ 一键清洗+翻译</button>
+      <button class="btn btn-primary" onclick="estimateAndExecute('both')" style="background:#7c3aed">⚡ Translate + Clean</button>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:12px;cursor:pointer;">
-        <input type="checkbox" id="batch-mode"> 🔄 批量模式（500+ 行后台处理，带进度）
+        <input type="checkbox" id="batch-mode"> 🔄 Batch mode (500+ rows, background processing)
       </label>
     </div>
 
     <!-- Results -->
     <div class="card hidden" id="section-results">
-      <h3>✅ 执行结果</h3>
+      <h3>✅ Results</h3>
       <p class="desc" id="result-desc"></p>
       <!-- Batch progress -->
       <div id="batch-progress" class="hidden" style="margin-bottom:12px;">
@@ -230,7 +237,7 @@ tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.resul
       <h4 style="margin:16px 0 8px;">📈 近 6 个月消费趋势</h4>
       <div class="chart-bar" id="dash-chart"></div>
       <div style="display:flex;gap:12px;margin-top:4px;font-size:10px;color:var(--muted);">
-        <span>🟣 翻译次数</span><span>🟢 清洗次数</span>
+        <span>🟣 Translations</span><span>🟢 Cleanings</span>
       </div>
       <h4 style="margin:16px 0 8px;">🔗 推荐好友 · 赚奖励金</h4>
       <div style="background:var(--purple-bg);border-radius:var(--radius-sm);padding:14px;margin-bottom:12px;">
@@ -241,22 +248,22 @@ tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.resul
         </div>
         <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;color:var(--muted);">
           <span id="ref-earned">累计赚取: $0.00</span><span id="ref-count">已推荐: 0 人</span>
-          <span>好友充值你赚 <strong style="color:#7c3aed;">10%</strong></span>
+          <span>Earn <strong style="color:#7c3aed;">10%</strong></span>
         </div>
       </div>
-      <h4 style="margin:16px 0 8px;">📋 最近操作</h4>
-      <div class="table-wrap" style="max-height:240px;"><table id="dash-recent"><thead><tr><th>时间</th><th>操作</th><th>详情</th><th>费用</th></tr></thead><tbody></tbody></table></div>
+      <h4 style="margin:16px 0 8px;">📋 Recent Activity</h4>
+      <div class="table-wrap" style="max-height:240px;"><table id="dash-recent"><thead><tr><th>Time</th><th>Action</th><th>Details</th><th>Cost</th></tr></thead><tbody></tbody></table></div>
     </div>
 
     <!-- Template Browser -->
     <div class="card hidden" id="section-templates">
       <h3>🧩 规则模板市场</h3>
-      <p class="desc">精选清洗和翻译方案，一键应用到工作台</p>
+      <p class="desc">Curated cleaning & translation templates — one click to apply</p>
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
         <button class="btn btn-sm btn-outline" onclick="loadTemplates('all')">全部</button>
-        <button class="btn btn-sm btn-outline" onclick="loadTemplates('clean')">🧹 清洗</button>
-        <button class="btn btn-sm btn-outline" onclick="loadTemplates('translate')">🌐 翻译</button>
-        <button class="btn btn-sm btn-outline" onclick="loadTemplates('both')">⚡ 清洗+翻译</button>
+        <button class="btn btn-sm btn-outline" onclick="loadTemplates('clean')">🧹 Clean</button>
+        <button class="btn btn-sm btn-outline" onclick="loadTemplates('translate')">🌐 Translate</button>
+        <button class="btn btn-sm btn-outline" onclick="loadTemplates('both')">⚡ Trans+Clean</button>
         <button class="btn btn-sm btn-primary" onclick="showSaveTemplate()" style="margin-left:auto;">💾 保存当前规则</button>
       </div>
       <div id="template-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;"></div>
@@ -270,7 +277,7 @@ tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.resul
     <h4 id="modal-est-title">💰 成本预估</h4>
     <p class="desc" id="modal-est-desc"></p>
     <div class="cost-lines" id="modal-est-lines"></div>
-    <div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);margin:12px 0"><span>当前余额</span><span id="modal-est-balance" style="font-weight:700"></span></div>
+    <div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);margin:12px 0"><span>Balance</span><span id="modal-est-balance" style="font-weight:700"></span></div>
     <div id="modal-est-insufficient" style="background:var(--red-bg);border:1px solid var(--red);border-radius:var(--radius-sm);padding:12px;margin-top:8px;font-size:13px;color:var(--red);display:none"></div>
     <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal('modal-estimate')">取消</button><button class="btn btn-primary" id="btn-est-confirm" onclick="confirmExecute()">确认执行</button></div>
   </div>
@@ -279,8 +286,8 @@ tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.resul
 <!-- Topup Modal -->
 <div class="modal-overlay hidden" id="modal-topup">
   <div class="modal">
-    <h4>💎 充值 Credits · 充越多送越多</h4>
-    <p class="desc">用不完不过期，可留到下月。翻译 $2/M 字符 · 清洗 $0.40/K token</p>
+    <h4>💎 Top Up Credits · 充越多送越多</h4>
+    <p class="desc">Balance never expires. Translate $2/M chars · Clean $0.40/K token</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
       <div onclick="selectTopup(10)" class="topup-opt" data-amount="10" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer"><strong>$10</strong><br><span style="font-size:11px;color:var(--green)">到账 $12（送 $2）</span></div>
       <div onclick="selectTopup(50)" class="topup-opt selected" data-amount="50" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--green);border-radius:var(--radius-sm);text-align:center;cursor:pointer;background:var(--green-bg)"><strong>$50</strong><br><span style="font-size:11px;color:var(--green);font-weight:700">🔥 超值！到账 $65（送 $15）</span></div>
@@ -295,15 +302,15 @@ tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.resul
   <div class="modal" style="text-align:center;">
     <div style="font-size:48px;margin-bottom:12px;">🎉</div>
     <h4>效果满意吗？</h4>
-    <p class="desc">你已经体验了 DataBridge 的翻译和清洗能力。<br>注册后即可连接你自己的 Airtable，处理真实数据。</p>
+    <p class="desc">You've tried DataBridge. Ready for more?<br>Register to connect your own Airtable base with real data.</p>
     <div style="display:flex;gap:10px;margin:16px 0;justify-content:center;">
       <div style="text-align:center;padding:12px 16px;background:var(--green-bg);border-radius:var(--radius-sm);">
         <div style="font-size:20px;font-weight:800;color:var(--green);">$2/M</div>
-        <div style="font-size:11px;color:var(--muted);">翻译 / 百万字符</div>
+        <div style="font-size:11px;color:var(--muted);">Translation / M chars</div>
       </div>
       <div style="text-align:center;padding:12px 16px;background:var(--accent-light);border-radius:var(--radius-sm);">
         <div style="font-size:20px;font-weight:800;color:var(--accent);">$0.40/K</div>
-        <div style="font-size:11px;color:var(--muted);">清洗 / 千 token</div>
+        <div style="font-size:11px;color:var(--muted);">Cleaning / K tokens</div>
       </div>
       <div style="text-align:center;padding:12px 16px;background:var(--purple-bg);border-radius:var(--radius-sm);">
         <div style="font-size:20px;font-weight:800;color:#7c3aed;">DeepSeek</div>
@@ -312,7 +319,7 @@ tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.resul
     </div>
     <div class="modal-actions" style="justify-content:center;">
       <button class="btn btn-outline" onclick="closeModal('modal-upgrade');resetDemo();">再试一次</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-upgrade');switchToRegister();">📝 立即注册</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-upgrade');switchToRegister();">📝 Register Now</button>
     </div>
   </div>
 </div>
@@ -321,12 +328,41 @@ tr:hover td{background:#f9fafb}td.result-new{background:var(--green-bg)}td.resul
 
 <footer style="text-align:center;padding:20px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);margin-top:24px;">
   © 2026 DataBridge ·
-  <a href="/terms" target="_blank" style="color:var(--muted);">服务条款</a> ·
-  <a href="/privacy" target="_blank" style="color:var(--muted);">隐私政策</a> ·
+  <a href="/terms" target="_blank" style="color:var(--muted);">Terms</a> ·
+  <a href="/privacy" target="_blank" style="color:var(--muted);">Privacy</a> ·
   Powered by DeepSeek
 </footer>
 
+<!-- Forgot Password Modal -->
+<div id="modal-forgot" class="modal-overlay hidden">
+<div class="modal"><h4>重置密码 / Reset Password</h4><p class="desc">输入注册邮箱获取验证码 / Enter your email to receive a reset code</p>
+<div class="form-group" style="margin-bottom:12px"><label>邮箱 Email</label><input type="email" id="forgot-email" placeholder="your@email.com"></div>
+<div id="forgot-step1"><button class="btn btn-primary" onclick="sendResetCode()">发送验证码 / Send Code</button></div>
+<div id="forgot-step2" class="hidden">
+<div class="form-group" style="margin-bottom:12px"><label>验证码 Code</label><input type="text" id="forgot-code" placeholder="6位数字"></div>
+<div class="form-group" style="margin-bottom:12px"><label>新密码 New Password</label><input type="password" id="forgot-new-password" placeholder="至少6位 / 6+ chars"></div>
+<button class="btn btn-primary" onclick="doResetPassword()">重置密码 / Reset</button>
+</div>
+<div class="modal-actions"><button class="btn btn-outline" onclick="document.getElementById('modal-forgot').classList.add('hidden')">关闭 Close</button></div>
+</div></div>
+
+<!-- Change Password Modal -->
+<div id="modal-change-pwd" class="modal-overlay hidden">
+<div class="modal"><h4>修改密码 / Change Password</h4>
+<div class="form-group" style="margin-bottom:12px"><label>当前密码 Current</label><input type="password" id="cpw-current"></div>
+<div class="form-group" style="margin-bottom:12px"><label>新密码 New</label><input type="password" id="cpw-new" placeholder="至少6位 / 6+ chars"></div>
+<button class="btn btn-primary" onclick="doChangePassword()">更新密码 / Update</button>
+<div class="modal-actions"><button class="btn btn-outline" onclick="document.getElementById('modal-change-pwd').classList.add('hidden')">关闭 Close</button></div>
+</div></div>
+
 <script>
+// ── Forgot Password ──
+function showForgotPassword(){document.getElementById('modal-forgot').classList.remove('hidden');document.getElementById('forgot-step1').classList.remove('hidden');document.getElementById('forgot-step2').classList.add('hidden');}
+async function sendResetCode(){const e=document.getElementById('forgot-email').value.trim();if(!e)return toast('Enter your email','error');await api('/api/auth/forgot-password',{method:'POST',body:JSON.stringify({email:e})});toast('验证码已发送 Code sent');document.getElementById('forgot-step1').classList.add('hidden');document.getElementById('forgot-step2').classList.remove('hidden');}
+async function doResetPassword(){const e=document.getElementById('forgot-email').value.trim(),c=document.getElementById('forgot-code').value.trim(),p=document.getElementById('forgot-new-password').value;if(!c||!p)return toast('Please fill all fields','error');if(p.length<6)return toast('Password must be 6+ characters','error');const r=await api('/api/auth/reset-password',{method:'POST',body:JSON.stringify({email:e,code:c,newPassword:p})});if(r.success){toast('密码已重置 Password reset!');document.getElementById('modal-forgot').classList.add('hidden');}}
+// ── Change Password ──
+function showChangePassword(){document.getElementById('modal-change-pwd').classList.remove('hidden');}
+async function doChangePassword(){const c=document.getElementById('cpw-current').value,n=document.getElementById('cpw-new').value;if(!c||!n)return toast('Please fill all fields','error');if(n.length<6)return toast('新Password must be 6+ characters','error');const r=await api('/api/auth/change-password',{method:'POST',body:JSON.stringify({currentPassword:c,newPassword:n})});if(r.success){toast('密码已更新 Password updated!');document.getElementById('modal-change-pwd').classList.add('hidden');}};
 // ── State ──
 let token = localStorage.getItem('databridge_token') || '';
 let user = null;
@@ -345,10 +381,10 @@ let demoLimits = { translateLeft:5, cleanLeft:5, maxPerType:5 };
 function authHeaders() { return token ? { 'Authorization':`Bearer ${token}`, 'Content-Type':'application/json' } : { 'Content-Type':'application/json' }; }
 async function api(url, opts={}) {
   const res = await fetch(API+url, { ...opts, headers: { ...authHeaders(), ...(opts.headers||{}) } });
-  if (res.status === 401) { logout(); throw new Error('登录已过期'); }
+  if (res.status === 401) { logout(); throw new Error('Session expired'); }
   if (res.status === 403) {
     const d = await res.json().catch(()=>({}));
-    if (d.emailNotVerified) { document.getElementById('verify-banner').classList.remove('hidden'); throw new Error('请先验证邮箱'); }
+    if (d.emailNotVerified) { document.getElementById('verify-banner').classList.remove('hidden'); throw new Error('Please verify your email first'); }
   }
   return res;
 }
@@ -363,7 +399,7 @@ function switchAuthTab(tab) {
 async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
-  if (!email||!password) return toast('请填写邮箱和密码','error');
+  if (!email||!password) return toast('Please fill in email and password','error');
   try {
     const res = await fetch(API+'/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
     const data = await res.json();
@@ -377,8 +413,8 @@ async function doLogin() {
 async function doRegister() {
   const email = document.getElementById('reg-email').value.trim();
   const password = document.getElementById('reg-password').value;
-  if (!email||!password) return toast('请填写邮箱和密码','error');
-  if (password.length < 6) return toast('密码至少6位','error');
+  if (!email||!password) return toast('Please fill in email and password','error');
+  if (password.length < 6) return toast('Password must be 6+ characters','error');
   try {
     const res = await fetch(API+'/api/auth/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
     const data = await res.json();
@@ -393,7 +429,7 @@ function logout() {
   token = ''; user = null; localStorage.removeItem('databridge_token');
   document.getElementById('section-auth').classList.remove('hidden');
   document.getElementById('app-sections').classList.add('hidden');
-  document.getElementById('btn-logout').classList.add('hidden');
+  document.getElementById('btn-logout').classList.add('hidden');document.getElementById('btn-change-pwd').classList.add('hidden');
   document.getElementById('user-email').textContent = '';
   updateBalance(0);
 }
@@ -401,7 +437,7 @@ function logout() {
 async function onAuthSuccess() {
   document.getElementById('section-auth').classList.add('hidden');
   document.getElementById('app-sections').classList.remove('hidden');
-  document.getElementById('btn-logout').classList.remove('hidden');
+  document.getElementById('btn-logout').classList.remove('hidden');document.getElementById('btn-change-pwd').classList.remove('hidden');
   document.getElementById('btn-dashboard').classList.remove('hidden');
   document.getElementById('btn-templates').classList.remove('hidden');
   document.getElementById('btn-script').classList.remove('hidden');
@@ -413,7 +449,7 @@ async function onAuthSuccess() {
   // Check email verification
   if (user.emailVerified === false) {
     document.getElementById('verify-banner').classList.remove('hidden');
-    toast('⚠️ 请先验证邮箱');
+    toast('⚠️ Please verify your email first');
   } else {
     document.getElementById('verify-banner').classList.add('hidden');
     toast('✅ 登录成功！');
@@ -439,7 +475,7 @@ async function verifyEmail() {
     if (!res.ok) throw new Error(data.error);
     user.emailVerified = true;
     document.getElementById('verify-banner').classList.add('hidden');
-    toast('✅ 邮箱验证成功！','success');
+    toast('✅ Email verified！','success');
   } catch(e) { toast('❌ '+e.message,'error'); }
 }
 
@@ -457,7 +493,7 @@ if (token) {
 // Handle Stripe redirect
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('topup') === 'success') {
-  setTimeout(() => toast('✅ 支付成功！请刷新查看余额', 'success'), 500);
+  setTimeout(() => toast('✅ Payment successful! Refresh to see balance', 'success'), 500);
   window.history.replaceState({}, '', '/');
 } else if (urlParams.get('topup') === 'cancel') {
   setTimeout(() => toast('支付已取消', 'error'), 500);
@@ -478,13 +514,13 @@ async function connectAirtable() {
     const data = await res.json();
     state.tables = data.tables;
     document.getElementById('select-table').innerHTML = data.tables.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
-    document.getElementById('conn-status').textContent = '✅ 已连接';
+    document.getElementById('conn-status').textContent = '✅ Connected';
     document.getElementById('conn-status').className = 'status-badge ok';
     document.getElementById('header-base-info').textContent = '📁 '+baseId.slice(0,12)+'...';
     document.getElementById('section-table').classList.remove('hidden');
     document.getElementById('section-ops').classList.remove('hidden');
     await loadFields(); await loadRecords();
-    toast('✅ 连接成功！');
+    toast('✅ Connected！');
   } catch(e) { toast('❌ '+e.message,'error'); }
   document.getElementById('btn-connect').disabled = false;
 }
@@ -534,16 +570,16 @@ async function loadRecords() {
 
 // ── Estimate & Execute ──
 async function estimateAndExecute(action) {
-  if (!state.selectedFields.length) return toast('请选择字段','error');
-  if (!state.records.length) return toast('请加载数据','error');
+  if (!state.selectedFields.length) return toast('Please select fields','error');
+  if (!state.records.length) return toast('Please load data first','error');
   state.pendingAction = action;
 
   // ── Demo mode: skip estimate, execute directly (free) ──
   if (isDemo) {
     // Check limits
-    if (action==='translate' && demoLimits.translateLeft<=0) return toast('翻译免费次数已用完','error');
-    if (action==='clean' && demoLimits.cleanLeft<=0) return toast('清洗免费次数已用完','error');
-    if (action==='both' && (demoLimits.translateLeft<=0||demoLimits.cleanLeft<=0)) return toast('免费次数不足','error');
+    if (action==='translate' && demoLimits.translateLeft<=0) return toast('No free translations left','error');
+    if (action==='clean' && demoLimits.cleanLeft<=0) return toast('No free cleanings left','error');
+    if (action==='both' && (demoLimits.translateLeft<=0||demoLimits.cleanLeft<=0)) return toast('No free uses left','error');
 
     document.getElementById('section-ops').classList.add('loading');
     try {
@@ -569,7 +605,7 @@ async function estimateAndExecute(action) {
       updateDemoCounter();
       state.lastResults = data.results;
       showResults({ ...data, cost:0, newBalance:0 });
-      toast(`✅ 免费试用完成！剩余: 翻译 ${demoLimits.translateLeft} 次 · 清洗 ${demoLimits.cleanLeft} 次`, 'success');
+      toast(`✅ Done! Remaining: Translate ${demoLimits.translateLeft} · Clean ${demoLimits.cleanLeft}`, 'success');
       if (data.showUpgradePrompt) {
         setTimeout(() => document.getElementById('modal-upgrade').classList.remove('hidden'), 2000);
       }
@@ -592,13 +628,13 @@ async function estimateAndExecute(action) {
     const u = await userRes.json();
     user = u; updateBalance(u.balance);
 
-    const titles = { translate:'🌐 翻译成本', clean:'🧹 清洗成本', both:'⚡ 清洗+翻译成本' };
+    const titles = { translate:'🌐 Translation Cost', clean:'🧹 Cleaning Cost', both:'⚡ Translate+Clean Cost' };
     document.getElementById('modal-est-title').textContent = titles[action];
     document.getElementById('modal-est-desc').textContent = `${est.recordCount} 条 · ${est.fieldCount} 个字段`;
 
     let lines = '';
-    if (est.breakdown.translation) lines += `<div class="line"><span>翻译 (${est.breakdown.translation.chars.toLocaleString()} 字符 × $${PRICE_TRANS}/M)</span><span>$${est.breakdown.translation.cost.toFixed(4)}</span></div>`;
-    if (est.breakdown.cleaning) lines += `<div class="line"><span>清洗 (${est.breakdown.cleaning.tokens.toLocaleString()} tokens × $${PRICE_CLEAN}/1K)</span><span>$${est.breakdown.cleaning.cost.toFixed(4)}</span></div>`;
+    if (est.breakdown.translation) lines += `<div class="line"><span>Translate (${est.breakdown.translation.chars.toLocaleString()} chars × $${PRICE_TRANS}/M)</span><span>$${est.breakdown.translation.cost.toFixed(4)}</span></div>`;
+    if (est.breakdown.cleaning) lines += `<div class="line"><span>Clean (${est.breakdown.cleaning.tokens.toLocaleString()} tokens × $${PRICE_CLEAN}/1K)</span><span>$${est.breakdown.cleaning.cost.toFixed(4)}</span></div>`;
     lines += `<div class="line"><span><strong>合计</strong></span><span style="color:var(--accent)"><strong>$${est.finalCost.toFixed(4)}</strong></span></div>`;
     document.getElementById('modal-est-lines').innerHTML = lines;
     document.getElementById('modal-est-balance').textContent = '$'+(u.balance||0).toFixed(2);
@@ -606,8 +642,8 @@ async function estimateAndExecute(action) {
     const insuf = document.getElementById('modal-est-insufficient');
     const btn = document.getElementById('btn-est-confirm');
     if ((u.balance||0) < est.finalCost) {
-      insuf.style.display = ''; insuf.innerHTML = `⚠️ <strong>余额不足！</strong>需要 $${est.finalCost}，当前 $${(u.balance||0).toFixed(2)}。<a href="#" onclick="closeModal('modal-estimate');showTopupModal()" style="color:var(--accent);font-weight:600">充值 →</a>`;
-      btn.disabled = true; btn.textContent = '余额不足';
+      insuf.style.display = ''; insuf.innerHTML = `⚠️ <strong>Insufficient balance！</strong>需要 $${est.finalCost}，当前 $${(u.balance||0).toFixed(2)}。<a href="#" onclick="closeModal('modal-estimate');showTopupModal()" style="color:var(--accent);font-weight:600">Top Up →</a>`;
+      btn.disabled = true; btn.textContent = 'Insufficient balance';
     } else {
       insuf.style.display = 'none'; btn.disabled = false; btn.textContent = '确认执行 ($'+est.finalCost.toFixed(4)+')';
     }
@@ -623,12 +659,12 @@ async function confirmExecute() {
     const res = await api('/api/execute', { method:'POST', body:JSON.stringify(body) });
     const data = await res.json();
     if (!res.ok) {
-      if (res.status===402) { toast('❌ 余额不足！需要 $'+data.required,'error'); closeModal('modal-estimate'); showTopupModal(); return; }
+      if (res.status===402) { toast('❌ Insufficient balance！需要 $'+data.required,'error'); closeModal('modal-estimate'); showTopupModal(); return; }
       if (res.status===429) { toast('⚠️ 请求太频繁，请1分钟后再试','error'); closeModal('modal-estimate'); return; }
       throw new Error(data.error);
     }
     closeModal('modal-estimate'); state.lastResults = data.results; updateBalance(data.newBalance);
-    toast('✅ 完成！扣费 $'+data.cost.toFixed(4)+' · '+data.backend,'success');
+    toast('✅ 完成！Cost: $'+data.cost.toFixed(4)+' · '+data.backend,'success');
     showResults(data);
   } catch(e) { toast('❌ '+e.message,'error'); }
   document.getElementById('btn-est-confirm').disabled = false;
@@ -636,7 +672,7 @@ async function confirmExecute() {
 
 function showResults(data) {
   const section = document.getElementById('section-results'); section.classList.remove('hidden');
-  document.getElementById('result-desc').textContent = `扣费 $${data.cost.toFixed(4)} · 余额 $${data.newBalance.toFixed(2)} · 后端: ${data.backend}`;
+  document.getElementById('result-desc').textContent = `Cost: $${data.cost.toFixed(4)} · 余额 $${data.newBalance.toFixed(2)} · 后端: ${data.backend}`;
   const fields = state.selectedFields;
   let html = '<table><thead><tr><th>#</th>'+fields.map(f=>`<th>${f} (原)</th><th>${f} (新)</th>`).join('')+'</tr></thead><tbody>';
   state.records.forEach((r,i)=>{
@@ -656,8 +692,8 @@ function showResults(data) {
 
 // ── Write Back ──
 async function writeBack() {
-  if (isDemo) return toast('演示模式使用只读数据，注册后可写回你自己的 Airtable','error');
-  if (!state.lastResults) return toast('无结果','error');
+  if (isDemo) return toast('Demo mode is read-only. Register to write to your own Airtable','error');
+  if (!state.lastResults) return toast('No results','error');
   const mode = document.getElementById('write-mode').value;
   const updates = [];
   state.records.forEach((r,i)=>{
@@ -698,13 +734,13 @@ async function startDemo() {
     document.getElementById('section-auth').classList.add('hidden');
     document.getElementById('app-sections').classList.remove('hidden');
     document.getElementById('demo-banner').classList.remove('hidden');
-    document.getElementById('btn-logout').classList.remove('hidden');
-    document.getElementById('btn-logout').textContent = '结束演示';
+    document.getElementById('btn-logout').classList.remove('hidden');document.getElementById('btn-change-pwd').classList.remove('hidden');
+    document.getElementById('btn-logout').textContent = 'End Demo';
     document.getElementById('btn-logout').onclick = resetDemo;
-    document.getElementById('user-email').textContent = '🎮 演示用户';
-    document.getElementById('conn-status').textContent = '🎮 演示数据';
+    document.getElementById('user-email').textContent = '🎮 Demo User';
+    document.getElementById('conn-status').textContent = '🎮 Demo Data';
     document.getElementById('conn-status').className = 'status-badge ok';
-    document.getElementById('header-base-info').textContent = '📁 Sales Leads (示例)';
+    document.getElementById('header-base-info').textContent = '📁 Sales Leads (Sample)';
     document.getElementById('section-connect').classList.add('hidden');
     document.getElementById('section-ops').classList.remove('hidden');
     document.getElementById('section-table').classList.remove('hidden');
@@ -720,7 +756,7 @@ async function startDemo() {
       `<span class="chip ${state.selectedFields.includes(f.name)?'selected':''}" onclick="toggleField('${f.name.replace(/'/g,"\\'")}',this)" title="${f.type}">${f.name}</span>`
     ).join('');
     renderDemoTable();
-    toast('🎮 演示模式已启动！翻译和清洗各可免费试用 5 次');
+    toast('🎮 Demo mode started! 3 free translations & cleanings');
   } catch(e) { toast('❌ 演示启动失败: '+e.message,'error'); }
 }
 
@@ -734,11 +770,11 @@ function renderDemoTable() {
   });
   html += '</tbody></table>';
   document.getElementById('table-container').innerHTML = html;
-  document.getElementById('record-info').textContent = `共 ${records.length} 条示例数据 · ${state.selectedFields.length} 个字段`;
+  document.getElementById('record-info').textContent = `${records.length} sample records · ${state.selectedFields.length} fields`;
 }
 
 function updateDemoCounter() {
-  document.getElementById('demo-counter').textContent = `翻译 ${demoLimits.translateLeft}/${demoLimits.maxPerType} · 清洗 ${demoLimits.cleanLeft}/${demoLimits.maxPerType}`;
+  document.getElementById('demo-counter').textContent = `Translate ${demoLimits.translateLeft}/${demoLimits.maxPerType} · Clean ${demoLimits.cleanLeft}/${demoLimits.maxPerType}`;
   // Check if all exhausted
   if (demoLimits.translateLeft <= 0 && demoLimits.cleanLeft <= 0) {
     setTimeout(() => document.getElementById('modal-upgrade').classList.remove('hidden'), 1500);
@@ -755,13 +791,13 @@ function resetDemo() {
   document.getElementById('section-ops').classList.add('hidden');
   document.getElementById('section-results').classList.add('hidden');
   document.getElementById('section-auth').classList.remove('hidden');
-  document.getElementById('btn-logout').classList.add('hidden');
+  document.getElementById('btn-logout').classList.add('hidden');document.getElementById('btn-change-pwd').classList.add('hidden');
   document.getElementById('user-email').textContent = '';
-  document.getElementById('conn-status').textContent = '⚡ 未连接';
+  document.getElementById('conn-status').textContent = '⚡ Disconnected';
   document.getElementById('conn-status').className = 'status-badge off';
   document.getElementById('header-base-info').textContent = '';
   document.getElementById('bal-badge').textContent = '💎 $0.00';
-  toast('演示已结束，注册后即可处理自己的数据！');
+  toast('Demo ended. Register to process your own data!');
 }
 
 function switchToRegister() {
@@ -773,13 +809,13 @@ function switchToRegister() {
 // ── Balance & Topup ──
 function updateBalance(bal) {
   const badge = document.getElementById('bal-badge');
-  if (isDemo) { badge.textContent = '🎮 免费试用'; badge.className = 'bal-badge'; return; }
+  if (isDemo) { badge.textContent = '🎮 Free Trial'; badge.className = 'bal-badge'; return; }
   badge.textContent = '💎 $'+parseFloat(bal).toFixed(2);
   badge.className = 'bal-badge'+(parseFloat(bal)<1?' low':'');
 }
 
 function showTopupModal() {
-  if (isDemo) return toast('演示模式无需充值，注册后即可充值使用','error');
+  if (isDemo) return toast('Registration required to top up','error');
   document.getElementById('modal-topup').classList.remove('hidden');
 }
 
@@ -861,7 +897,7 @@ async function loadTemplates(cat) {
         </div>
         <p style="font-size:12px;color:var(--muted);margin:8px 0;">${t.desc}</p>
         <div style="display:flex;gap:6px;">
-          <span style="font-size:10px;background:var(--bg);padding:2px 8px;border-radius:10px;">${t.category==='translate'?'🌐翻译':t.category==='clean'?'🧹清洗':'⚡清洗+翻译'}</span>
+          <span style="font-size:10px;background:var(--bg);padding:2px 8px;border-radius:10px;">${t.category==='translate'?'🌐 Translate':t.category==='clean'?'🧹 Clean':'⚡ Trans+Clean'}</span>
           <span style="font-size:10px;background:var(--bg);padding:2px 8px;border-radius:10px;">by ${t.author}</span>
         </div>
         <button class="btn btn-sm btn-primary" style="margin-top:8px;width:100%;" onclick="applyTemplate('${t.id}')">应用此方案</button>
@@ -870,7 +906,7 @@ async function loadTemplates(cat) {
 }
 
 function applyTemplate(id) {
-  toast('✅ 模板已应用！请到工作台选择数据执行', 'success');
+  toast('✅ Template applied! Select data to execute', 'success');
   document.getElementById('section-templates').classList.add('hidden');
 }
 
@@ -902,9 +938,9 @@ async function loadDashboard() {
       <div class="stat-mini"><div class="val">$${d.thisMonth}</div><div class="lbl">本月消费</div></div>
       <div class="stat-mini"><div class="val">$${d.thisWeek}</div><div class="lbl">本周消费</div></div>
       <div class="stat-mini"><div class="val">$${d.totalSpent}</div><div class="lbl">累计消费</div></div>
-      <div class="stat-mini"><div class="val">${d.translateCount}</div><div class="lbl">翻译次数</div></div>
-      <div class="stat-mini"><div class="val">${d.cleanCount}</div><div class="lbl">清洗次数</div></div>
-      <div class="stat-mini"><div class="val">${d.topupCount}</div><div class="lbl">充值次数</div></div>`;
+      <div class="stat-mini"><div class="val">${d.translateCount}</div><div class="lbl">Translations</div></div>
+      <div class="stat-mini"><div class="val">${d.cleanCount}</div><div class="lbl">Cleanings</div></div>
+      <div class="stat-mini"><div class="val">${d.topupCount}</div><div class="lbl">Topups</div></div>`;
     // Chart
     const maxCost = Math.max(...d.monthlyBreakdown.map(m=>m.cost), 1);
     document.getElementById('dash-chart').innerHTML = d.monthlyBreakdown.map(m => `
@@ -920,10 +956,10 @@ async function loadDashboard() {
     document.getElementById('dash-recent').querySelector('tbody').innerHTML = d.recent.slice(0,20).map(u => `
       <tr>
         <td>${new Date(u.timestamp).toLocaleString('zh-CN')}</td>
-        <td>${u.action==='translate'?'🌐翻译':u.action==='clean'?'🧹清洗':u.action==='both'?'⚡清洗+翻译':u.action.includes('batch')?'🔄批量'+u.action:'💳充值'}</td>
+        <td>${u.action==='translate'?'🌐 Translate':u.action==='clean'?'🧹 Clean':u.action==='both'?'⚡ Trans+Clean':u.action.includes('batch')?'🔄 Batch '+u.action:'💳 Topup'}</td>
         <td style="font-size:11px;color:var(--muted);">${JSON.stringify(u.details).slice(0,40)}</td>
         <td style="font-weight:600;">$${u.cost.toFixed(4)}</td>
-      </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">暂无操作记录</td></tr>';
+      </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">No records yet</td></tr>';
   } catch(e) { /* ignore */ }
 }
 
@@ -992,8 +1028,8 @@ async function pollBatchJob(jobId) {
 const origEstimateAndExecute = estimateAndExecute;
 estimateAndExecute = async function(action) {
   if (document.getElementById('batch-mode').checked && !isDemo) {
-    if (!state.selectedFields.length) return toast('请选择字段','error');
-    if (!state.records.length) return toast('请加载数据','error');
+    if (!state.selectedFields.length) return toast('Please select fields','error');
+    if (!state.records.length) return toast('Please load data first','error');
     // Use batch endpoint
     const records = state.records.map(r=>{const o={};state.selectedFields.forEach(f=>{if(r[f]!==undefined)o[f]=r[f]});return o;});
     try {
@@ -1014,6 +1050,26 @@ estimateAndExecute = async function(action) {
   }
   return origEstimateAndExecute(action);
 };
+
+// ── i18n: apply language to all static text on page load ──
+function applyI18nHTML() {
+  if (currentLang === 'en') return; // HTML defaults are English
+  const $ = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  const Q = (sel, text) => { const el = document.querySelector(sel); if (el) el.textContent = text; };
+  const A = (sel, attr, text) => { const el = document.querySelector(sel); if (el) el.setAttribute(attr, text); };
+
+  $('tab-login', '登录'); $('tab-register', '注册');
+  Q('#form-login label', '邮箱'); Q('#form-register label', '邮箱');
+  A('#login-password', 'placeholder', '至少6位'); A('#reg-password', 'placeholder', '至少6位');
+  $('btn-register', '注册');
+  Q('#form-login .btn-primary', '登录');
+  Q('#forgot-link', 'Forgot password?');
+  Q('#form-register label[style]', undefined); // skip
+  Q('#section-auth > p:nth-of-type(1)', '🔐 Email verification required. Password encrypted.');
+  Q('#section-auth > p:nth-of-type(2)', '🔒 Your PAT stays in your browser，我们不上传也不存储。');
+}
+
+document.addEventListener('DOMContentLoaded', applyI18nHTML);
 </script>
 </body>
 </html>

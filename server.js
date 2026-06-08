@@ -64,7 +64,7 @@ function generateCode() { return String(Math.floor(100000 + Math.random() * 9000
 async function sendVerificationEmail(email, code) {
   if (!mailer) { console.log(`[EMAIL] Would send code ${code} to ${email} (SMTP not configured)`); return; }
   await mailer.sendMail({
-    from: process.env.SMTP_FROM || 'noreply@databridge.app',
+    from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@databridge.app',
     to: email,
     subject: 'DataBridge - 邮箱验证码',
     text: `您的验证码是：${code}\n\n有效期 10 分钟。如非本人操作请忽略。`,
@@ -91,7 +91,9 @@ if (!fs.existsSync(USAGE_FILE)) fs.writeFileSync(USAGE_FILE, '[]');
 
 // ── Demo sessions (in-memory, no login) ──
 const demoSessions = {};
-const DEMO_MAX_PER_TYPE = 5;
+const demoIPUsage = {};  // IP-based rate limiting for demo abuse prevention
+const DEMO_MAX_PER_TYPE = 3;
+const DEMO_MAX_PER_IP = 10;  // Max total demo requests per IP per day
 
 // Mock Airtable data for demo mode
 const DEMO_FIELDS = [
@@ -114,11 +116,16 @@ const DEMO_RECORDS = [
   { id:'rec10', 'Company Name':' Massive Dynamic', 'Description':'Cutting-edge research in robotics, AI, and quantum computing', 'Contact Email':'walter@massivedynamic.com', 'Phone':'+1-617-555-0147', 'Revenue':4200000 },
 ];
 
-// Cleanup stale demo sessions every hour
+// Cleanup stale demo sessions & IP tracking every hour
 setInterval(() => {
   const now = Date.now();
   for (const [id, s] of Object.entries(demoSessions)) {
     if (now - s.createdAt > 3600000) delete demoSessions[id];
+  }
+  // Clean yesterday's IP records
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  for (const key of Object.keys(demoIPUsage)) {
+    if (key.endsWith(yesterday)) delete demoIPUsage[key];
   }
 }, 600000);
 
@@ -400,6 +407,84 @@ app.post('/api/auth/verify-email', authRequired, (req, res) => {
   user.codeExpiresAt = null;
   writeJSON(USERS_FILE, users);
   res.json({ verified: true });
+});
+
+// Change password (logged in)
+app.post('/api/auth/change-password', authRequired, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: '请输入当前密码和新密码' });
+    if (newPassword.length < 6) return res.status(400).json({ error: '新密码至少 6 位' });
+
+    const users = readJSON(USERS_FILE);
+    const user = users[req.userId];
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) return res.status(401).json({ error: '当前密码错误' });
+
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    writeJSON(USERS_FILE, users);
+    res.json({ success: true, message: '密码已更新' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Forgot password — send reset code
+app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: '请输入邮箱' });
+
+    const users = readJSON(USERS_FILE);
+    const user = Object.values(users).find(u => u.email === email);
+    // Always return success to prevent email enumeration
+    if (!user) return res.json({ sent: true });
+
+    const code = generateCode();
+    user.resetCode = code;
+    user.resetCodeExpiresAt = Date.now() + 600000; // 10 min
+    writeJSON(USERS_FILE, users);
+
+    if (mailer) {
+      await mailer.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@databridge.app',
+        to: email,
+        subject: 'DataBridge - Password Reset',
+        text: `Your password reset code is: ${code}\n\nValid for 10 minutes.`,
+        html: `<h2>DataBridge Password Reset</h2><p>Your reset code: <strong style="font-size:24px">${code}</strong></p><p>Valid for 10 minutes.</p>`
+      });
+    } else {
+      console.log(`[EMAIL] Would send reset code ${code} to ${email}`);
+    }
+    res.json({ sent: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reset password with code
+app.post('/api/auth/reset-password', authLimiter, async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+    if (!email || !code || !newPassword) return res.status(400).json({ error: '邮箱、验证码和新密码不能为空' });
+    if (newPassword.length < 6) return res.status(400).json({ error: '新密码至少 6 位' });
+
+    const users = readJSON(USERS_FILE);
+    const user = Object.values(users).find(u => u.email === email);
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+    if (Date.now() > (user.resetCodeExpiresAt || 0)) return res.status(400).json({ error: '验证码已过期' });
+    if (user.resetCode !== String(code)) return res.status(400).json({ error: '验证码错误' });
+
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    user.resetCode = null;
+    user.resetCodeExpiresAt = null;
+    writeJSON(USERS_FILE, users);
+    res.json({ success: true, message: '密码已重置，请用新密码登录' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ═══════════════ API Routes ═══════════════
@@ -822,7 +907,7 @@ app.post('/api/demo/start', (req, res) => {
     sessionId: sid,
     baseId: 'app_demo_base',
     tableId: 'tbl_demo_leads',
-    tableName: 'Sales Leads (演示数据)',
+    tableName: 'Sales Leads (Sample Data)',
     fields: DEMO_FIELDS,
     records: DEMO_RECORDS,
     limits: { maxPerType: DEMO_MAX_PER_TYPE, translateLeft: DEMO_MAX_PER_TYPE, cleanLeft: DEMO_MAX_PER_TYPE }
@@ -835,15 +920,24 @@ app.post('/api/demo/execute', async (req, res) => {
     const session = demoSessions[sessionId];
     if (!session) return res.status(404).json({ error: '演示会话已过期，请重新开始' });
 
-    // Check limits
+    // IP-based abuse prevention: max DEMO_MAX_PER_IP requests per IP per day
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+    const today = new Date().toISOString().slice(0, 10);
+    const ipKey = `${ip}:${today}`;
+    if (!demoIPUsage[ipKey]) demoIPUsage[ipKey] = 0;
+    if (demoIPUsage[ipKey] >= DEMO_MAX_PER_IP) {
+      return res.json({ limitReached: true, type: 'ip', message: '今日演示次数已用完，请明天再试或注册账号' });
+    }
+
+    // Check per-session limits
     if (action === 'translate' || action === 'both') {
       if (session.translateUsed >= DEMO_MAX_PER_TYPE) {
-        return res.json({ limitReached: true, type: 'translate', message: '免费翻译次数已用完 (5/5)' });
+        return res.json({ limitReached: true, type: 'translate', message: `免费翻译次数已用完 (${DEMO_MAX_PER_TYPE}/${DEMO_MAX_PER_TYPE})` });
       }
     }
     if (action === 'clean' || action === 'both') {
       if (session.cleanUsed >= DEMO_MAX_PER_TYPE) {
-        return res.json({ limitReached: true, type: 'clean', message: '免费清洗次数已用完 (5/5)' });
+        return res.json({ limitReached: true, type: 'clean', message: `免费清洗次数已用完 (${DEMO_MAX_PER_TYPE}/${DEMO_MAX_PER_TYPE})` });
       }
     }
 
@@ -851,12 +945,14 @@ app.post('/api/demo/execute', async (req, res) => {
     const records = DEMO_RECORDS.map(r => { const o = {}; fields.forEach(f => { if (r[f] !== undefined) o[f] = r[f]; }); return o; });
     const results = { cleaned: {}, translated: {} };
 
-    // Execute (always free, never call real APIs for demo)
+    // Demo uses real DeepSeek for best impression — cost is negligible (~$0.01/demo user)
+    const useRealAI = !DEMO_MODE;
+
     if (action === 'translate' || action === 'both') {
       const texts = [], textMap = [];
       records.forEach((r, ri) => fields.forEach(f => { if (r[f] && typeof r[f] === 'string') { texts.push(r[f]); textMap.push({ ri, f }); } }));
       if (texts.length > 0) {
-        const translated = TRANSLATION_BACKEND !== 'mock'
+        const translated = useRealAI
           ? await translateWithLLM(texts, targetLang || 'ZH')
           : await mockTranslate(texts, targetLang || 'ZH');
         translated.forEach((t, i) => { const { ri, f } = textMap[i]; if (!results.translated[ri]) results.translated[ri] = {}; results.translated[ri][f] = t; });
@@ -865,10 +961,14 @@ app.post('/api/demo/execute', async (req, res) => {
     }
 
     if (action === 'clean' || action === 'both') {
-      const r = await mockClean(records, cleaningInstruction || '去除多余空格，标准化公司名');
+      const r = useRealAI
+        ? await cleanWithLLM(records, cleaningInstruction || 'Clean and standardize data', fields)
+        : await mockClean(records, cleaningInstruction || '去除多余空格，标准化公司名');
       r.cleaned.forEach((c, i) => { if (!results.cleaned[i]) results.cleaned[i] = {}; Object.assign(results.cleaned[i], c); });
       session.cleanUsed++;
     }
+
+    demoIPUsage[ipKey]++;
 
     const tl = DEMO_MAX_PER_TYPE - session.translateUsed;
     const cl = DEMO_MAX_PER_TYPE - session.cleanUsed;
@@ -893,6 +993,27 @@ app.post('/api/demo/execute', async (req, res) => {
 });
 
 // ═══════════════ Admin Panel ═══════════════
+// ── Visit tracking ──
+const VISITS_FILE = path.join(DATA_DIR, 'visits.json');
+let visitsData = fs.existsSync(VISITS_FILE) ? readJSON(VISITS_FILE) : { daily: {}, users: {}, actions: {} };
+
+app.use((req, res, next) => {
+  const today = new Date().toISOString().slice(0, 10);
+  if (!visitsData.daily[today]) visitsData.daily[today] = { pageviews: 0, uniqueIPs: new Set() };
+  visitsData.daily[today].pageviews++;
+  const ip = req.ip || 'unknown';
+  if (typeof visitsData.daily[today].uniqueIPs.add === 'function') visitsData.daily[today].uniqueIPs.add(ip);
+  // Save every 50 requests
+  if (visitsData.daily[today].pageviews % 50 === 0) {
+    const save = { daily: {}, users: visitsData.users, actions: visitsData.actions };
+    for (const [k, v] of Object.entries(visitsData.daily)) {
+      save.daily[k] = { pageviews: v.pageviews, uniqueIPs: v.uniqueIPs.size || (v.uniqueIPs instanceof Set ? v.uniqueIPs.size : 1) };
+    }
+    writeJSON(VISITS_FILE, save);
+  }
+  next();
+});
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 function adminAuth(req, res, next) {
@@ -915,6 +1036,41 @@ app.get('/api/admin/stats', adminAuth, (req, res) => {
     margin: rev>0?Math.round((rev-wholesale)/rev*100):0,
     totalBalance: parseFloat(userList.reduce((s,u)=>s+(u.balance||0),0).toFixed(2)),
     topUsers: userList.sort((a,b)=>(b.balance||0)-(a.balance||0)).slice(0,10).map(u=>({id:u.id,email:u.email,balance:u.balance,emailVerified:u.emailVerified}))
+  });
+});
+
+// Analytics dashboard
+app.get('/api/admin/analytics', adminAuth, (req, res) => {
+  const usage = readJSON(USAGE_FILE);
+  const users = Object.values(readJSON(USERS_FILE));
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+
+  const vToday = visitsData.daily[today] || { pageviews: 0, uniqueIPs: new Set() };
+  const uvToday = vToday.uniqueIPs instanceof Set ? vToday.uniqueIPs.size : (vToday.uniqueIPs || 0);
+
+  const visitChart = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const v = visitsData.daily[key] || { pageviews: 0, uniqueIPs: new Set() };
+    const uv = v.uniqueIPs instanceof Set ? v.uniqueIPs.size : (v.uniqueIPs || 0);
+    visitChart.push({ date: key.slice(5), pv: v.pageviews || 0, uv });
+  }
+
+  const todayUsage = usage.filter(u => u.timestamp.startsWith(today));
+  const translations = todayUsage.filter(u => u.action === 'translate' || u.action === 'both').length;
+  const cleanings = todayUsage.filter(u => u.action === 'clean' || u.action === 'both').length;
+
+  res.json({
+    today: { pageviews: vToday.pageviews || 0, uniqueVisitors: uvToday, translations, cleanings },
+    visitChart,
+    totalUsers: users.length,
+    activeUsers24h: new Set(usage.filter(u => now - new Date(u.timestamp) < 86400000).map(u => u.userId)).size,
+    recentActions: usage.slice(-20).reverse().map(u => ({
+      time: u.timestamp ? new Date(u.timestamp).toLocaleString() : '',
+      action: u.action, userId: u.userId ? u.userId.slice(0, 8) + '...' : 'anon', cost: u.cost || 0
+    }))
   });
 });
 
@@ -974,63 +1130,38 @@ app.get('/api/airtable-script', (req, res) => {
 
 // ── Admin page ──
 app.get('/admin', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>DataBridge 管理面板</title>
-<style>body{font-family:-apple-system,system-ui,sans-serif;max-width:900px;margin:24px auto;padding:0 20px;color:#111827;background:#f8f9fb}
-.card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:20px;margin-bottom:16px}
-h2{font-size:18px;margin-bottom:12px}.stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6}
-.stat .val{font-weight:700}.green{color:#059669}.red{color:#dc2626}
-table{width:100%;border-collapse:collapse;font-size:13px}th{background:#f9fafb;padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb}
-td{padding:7px 12px;border-bottom:1px solid #f3f4f6}
-input{padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;margin-right:8px}
-button{padding:8px 16px;background:#4f46e5;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px}
-#login-box{text-align:center;padding:60px 0}#stats-area{display:none}</style></head><body>
-<div id="login-box"><h2>🔐 管理员登录</h2><input type="password" id="pwd" placeholder="管理员密码"><button onclick="login()">登录</button></div>
-<div id="stats-area"><h2>📊 DataBridge 管理面板</h2><div id="cards"></div><h3>👥 Top 10 用户</h3><table id="users"><thead><tr><th>ID</th><th>邮箱</th><th>余额</th><th>已验证</th></tr></thead><tbody></tbody></table></div>
-<script>
-let token='';
-function login(){token=document.getElementById('pwd').value;load();}
-async function load(){
-  const r=await fetch('/api/admin/stats',{headers:{'x-admin-token':token}});
-  if(!r.ok){alert('密码错误');return}
-  const d=await r.json();
-  document.getElementById('login-box').style.display='none';
-  document.getElementById('stats-area').style.display='';
-  document.getElementById('cards').innerHTML=
-    '<div class="card"><h3>概览</h3>'+['总用户:'+d.totalUsers,'已验证:'+d.verifiedUsers,'本周活跃:'+d.activeThisWeek,'总余额:$'+d.totalBalance].map(s=>'<div class="stat"><span>'+s.split(':')[0]+'</span><span class="val">'+s.split(':')[1]+'</span></div>').join('')+'</div>'+
-    '<div class="card"><h3>本月财务</h3>'+['收入:$'+d.monthlyRevenue,'成本:$'+d.monthlyWholesale,'利润:$'+d.monthlyProfit,'利润率:'+d.margin+'%'].map(s=>'<div class="stat"><span>'+s.split(':')[0]+'</span><span class="val '+(s.includes('利润')?'green':'')+'">'+s.split(':')[1]+'</span></div>').join('')+'</div>';
-  document.getElementById('users').querySelector('tbody').innerHTML=d.topUsers.map(u=>'<tr><td>'+u.id+'</td><td>'+u.email+'</td><td>$'+(u.balance||0).toFixed(2)+'</td><td>'+(u.emailVerified?'✅':'❌')+'</td></tr>').join('');
-}
-</script></body></html>`);
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // ── Legal pages ──
 app.get('/terms', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>服务条款 - DataBridge</title>
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Terms of Service — DataBridge</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:720px;margin:40px auto;padding:0 20px;line-height:1.8;color:#111827}
 h1{font-size:24px}h2{font-size:18px;margin-top:24px}</style></head><body>
-<h1>DataBridge 服务条款</h1><p>最后更新：2026年6月2日</p>
-<h2>1. 服务说明</h2><p>DataBridge 提供基于 AI 的数据清洗和翻译服务，用户通过连接 Airtable 使用本服务。服务按实际用量计费。</p>
-<h2>2. 用户责任</h2><p>用户负责保管 Airtable PAT 和账户密码。用户保证其数据来源合法，不包含违法或侵权内容。</p>
-<h2>3. 费用与支付</h2><p>翻译 $2/百万字符，清洗 $0.40/千token。充值后余额不可退款（法律另有规定除外）。未使用的余额永不过期。</p>
-<h2>4. 服务可用性</h2><p>我们尽力保证服务可用，但不承担因第三方 API（DeepSeek、Airtable）故障导致的服务中断责任。</p>
-<h2>5. 数据隐私</h2><p>我们仅在处理请求时临时访问用户数据，不存储用户的 Airtable 数据内容。详见隐私政策。</p>
-<h2>6. 免责声明</h2><p>AI 生成的翻译和清洗结果可能存在误差，用户应自行审核重要数据。</p>
-<h2>7. 条款修改</h2><p>我们保留修改本条款的权利，重大变更将通过邮件通知。</p>
-<p style="margin-top:32px">如有问题：support@databridge.app</p>
+<h1>DataBridge Terms of Service</h1><p>Last updated: June 8, 2026</p>
+<h2>1. Service</h2><p>DataBridge provides AI-powered data cleaning and translation. Users connect via Airtable PAT. Billing is usage-based.</p>
+<h2>2. User Responsibilities</h2><p>Keep your Airtable PAT and password secure. You are responsible for data legality and must not process illegal or infringing content.</p>
+<h2>3. Fees & Payment</h2><p>Translation: $2/million chars. Cleaning: $0.40/1K tokens. Prepaid balance is non-refundable (unless required by law). Balance never expires.</p>
+<h2>4. Availability</h2><p>We strive for uptime but are not liable for outages caused by third-party APIs (DeepSeek, Airtable, Stripe).</p>
+<h2>5. Data Privacy</h2><p>We only access data transiently during processing. Airtable content is never stored on our servers. See Privacy Policy.</p>
+<h2>6. Disclaimer</h2><p>AI-generated results may contain errors. Review critical data before use.</p>
+<h2>7. Changes</h2><p>We may update these terms. Major changes will be notified by email.</p>
+<p style="margin-top:32px">Contact: support@databridge.app</p>
 </body></html>`);
 });
 
 app.get('/privacy', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>隐私政策 - DataBridge</title>
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Privacy Policy — DataBridge</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:720px;margin:40px auto;padding:0 20px;line-height:1.8;color:#111827}
 h1{font-size:24px}h2{font-size:18px;margin-top:24px}</style></head><body>
-<h1>DataBridge 隐私政策</h1><p>最后更新：2026年6月2日</p>
-<h2>1. 我们收集什么</h2><p>注册邮箱、密码（加密存储）、充值记录、API 调用次数和费用。我们<strong>不存储</strong>您的 Airtable 数据内容。</p>
-<h2>2. 数据使用方式</h2><p>您的 Airtable 数据仅在被处理时临时传输到 DeepSeek/OpenAI API，处理完成后不保留副本。</p>
-<h2>3. 数据存储</h2><p>用户账户信息存储在服务器本地 JSON 文件中。支付信息由 Stripe 处理，我们不在服务器存储信用卡信息。</p>
-<h2>4. Cookie</h2><p>我们使用 JWT token 维持登录状态，不设置第三方跟踪 Cookie。</p>
-<h2>5. 数据删除</h2><p>您可以通过 support@databridge.app 请求删除账户及所有关联数据，我们将在 7 个工作日内处理。</p>
-<h2>6. 第三方服务</h2><p>本服务依赖 DeepSeek API（数据处理）、Stripe（支付）、Airtable API（数据连接）。请同时参阅这些服务的隐私政策。</p>
+<h1>DataBridge Privacy Policy</h1><p>Last updated: June 8, 2026</p>
+<h2>1. What We Collect</h2><p>Email, encrypted password, top-up records, and API usage stats. We <strong>do NOT store</strong> your Airtable data content.</p>
+<h2>2. Where Your Data Lives</h2><p>Account data is stored on secure servers (Render, Singapore region). Payment processing is handled by Stripe — we never see or store your credit card.</p>
+<h2>3. Your Airtable PAT</h2><p><strong>Your PAT stays in your browser and is never uploaded to our server.</strong> It is stored only in your browser's localStorage and transmitted directly to Airtable's API. You can remove it at any time by clearing your browser data or logging out.</p>
+<h2>4. Processing</h2><p>Airtable data is transmitted to DeepSeek API for translation/cleaning and immediately discarded. No copies retained.</p>
+<h2>5. Cookies</h2><p>JWT tokens for login sessions only. No third-party tracking cookies.</p>
+<h2>6. Data Deletion</h2><p>Email support@databridge.app to delete your account. Processed within 7 business days.</p>
+<h2>7. Third-Party Services</h2><p>We rely on DeepSeek API (AI), Stripe (payments), and Airtable API (data). Review their privacy policies as well.</p>
 </body></html>`);
 });
 
