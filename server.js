@@ -1040,6 +1040,21 @@ app.get('/api/admin/stats', adminAuth, (req, res) => {
 });
 
 // Analytics dashboard
+// Submit sitemap to search engines (runs on Railway US server)
+app.get('/api/admin/submit-sitemap', adminAuth, async (req, res) => {
+  const sitemap = 'https://airtable-plugin-proto-production.up.railway.app/sitemap.xml';
+  const results = {};
+  try {
+    const r = await fetch(`https://www.google.com/ping?sitemap=${encodeURIComponent(sitemap)}`);
+    results.google = r.status;
+  } catch(e) { results.google = e.message; }
+  try {
+    const r = await fetch(`https://www.bing.com/indexnow?url=${encodeURIComponent(sitemap)}&key=databridge2026`);
+    results.bing = r.status;
+  } catch(e) { results.bing = e.message; }
+  res.json({ ok: true, results });
+});
+
 app.get('/api/admin/analytics', adminAuth, (req, res) => {
   const usage = readJSON(USAGE_FILE);
   const users = Object.values(readJSON(USERS_FILE));
