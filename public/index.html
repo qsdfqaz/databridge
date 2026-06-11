@@ -2,20 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DataBridge — AI-Powered Data Cleaning & Translation for Airtable</title>
-<meta name="description" content="DataBridge connects to your Airtable base for bulk AI data cleaning (DeepSeek) and translation to 6+ languages. 3 free uses, no login.">
+<title>TableTurn — AI-Powered Data Cleaning & Translation for Airtable</title>
+<meta name="description" content="TableTurn connects to your Airtable base for bulk AI data cleaning (DeepSeek) and translation to 6+ languages. 3 free uses, no login.">
 <meta name="keywords" content="Airtable, AI translation, data cleaning, DeepSeek, bulk translate, Airtable tool, data standardization">
 <meta name="robots" content="index, follow">
-<meta property="og:title" content="DataBridge — AI Cleaning & Translation for Airtable">
+<meta property="og:title" content="TableTurn — AI Cleaning & Translation for Airtable">
 <meta property="og:description" content="Bulk translate and clean your Airtable data with DeepSeek AI. 3 free uses, no registration. Connects via PAT.">
 <meta property="og:url" content="https://airtable-plugin-proto-production.up.railway.app">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="DataBridge — AI Cleaning & Translation for Airtable">
+<meta name="twitter:title" content="TableTurn — AI Cleaning & Translation for Airtable">
 <meta name="twitter:description" content="Bulk translate and clean your Airtable data with AI. Free to try.">
 <link rel="canonical" href="https://airtable-plugin-proto-production.up.railway.app">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"DataBridge","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"AI-powered data cleaning and translation tool for Airtable. Bulk translate and clean your Airtable data with DeepSeek AI.","url":"https://airtable-plugin-proto-production.up.railway.app","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Organization","name":"DataBridge"}}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"TableTurn","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"AI-powered data cleaning and translation tool for Airtable. Bulk translate and clean your Airtable data with DeepSeek AI.","url":"https://airtable-plugin-proto-production.up.railway.app","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Organization","name":"TableTurn"}}
 </script>
 <script src="/i18n.js"></script>
 <style>
@@ -109,7 +109,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
 <body>
 
 <header class="app-header">
-  <div class="logo"><div class="logo-dot"></div>DataBridge</div>
+  <div class="logo"><div class="logo-dot"></div>TableTurn</div>
   <span id="header-base-info" style="font-size:12px;color:var(--muted)"></span>
   <div class="header-right">
     <button class="btn btn-sm btn-outline" id="btn-lang" onclick="switchLang(currentLang==='zh'?'en':'zh')" title="Switch Language">🌐 EN</button>
@@ -339,7 +339,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
   <div class="modal" style="text-align:center;">
     <div style="font-size:48px;margin-bottom:12px;">🎉</div>
     <h4>效果满意吗？</h4>
-    <p class="desc">You've tried DataBridge. Ready for more?<br>Register to connect your own Airtable base with real data.</p>
+    <p class="desc">You've tried TableTurn. Ready for more?<br>Register to connect your own Airtable base with real data.</p>
     <div style="display:flex;gap:10px;margin:16px 0;justify-content:center;">
       <div style="text-align:center;padding:12px 16px;background:var(--green-bg);border-radius:var(--radius-sm);">
         <div style="font-size:20px;font-weight:800;color:var(--green);">$2/M</div>
@@ -364,7 +364,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
 <div id="toast-container"></div>
 
 <footer style="text-align:center;padding:20px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);margin-top:24px;">
-  © 2026 DataBridge ·
+  © 2026 TableTurn ·
   <a href="/terms" target="_blank" style="color:var(--muted);">Terms</a> ·
   <a href="/privacy" target="_blank" style="color:var(--muted);">Privacy</a> ·
   Powered by DeepSeek
@@ -739,7 +739,7 @@ async function writeBack() {
       let nv = r[f]||'';
       if (state.lastResults.cleaned?.[i]?.[f]) nv = state.lastResults.cleaned[i][f];
       if (state.lastResults.translated?.[i]?.[f]) nv = state.lastResults.translated[i][f];
-      const tf = mode==='new_column' ? f+' (DataBridge)' : f;
+      const tf = mode==='new_column' ? f+' (TableTurn)' : f;
       if (String(nv)!==String(r[f]||'')) fields[tf] = nv;
     });
     if (Object.keys(fields).length) updates.push({id:r.id,fields});

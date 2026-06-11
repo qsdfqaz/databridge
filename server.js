@@ -66,9 +66,9 @@ async function sendVerificationEmail(email, code) {
   await mailer.sendMail({
     from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@databridge.app',
     to: email,
-    subject: 'DataBridge - 邮箱验证码',
+    subject: 'TableTurn - 邮箱验证码',
     text: `您的验证码是：${code}\n\n有效期 10 分钟。如非本人操作请忽略。`,
-    html: `<h2>DataBridge 邮箱验证</h2><p>您的验证码是：<strong style="font-size:24px">${code}</strong></p><p>有效期 10 分钟。</p>`
+    html: `<h2>TableTurn 邮箱验证</h2><p>您的验证码是：<strong style="font-size:24px">${code}</strong></p><p>有效期 10 分钟。</p>`
   });
 }
 
@@ -451,9 +451,9 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
       await mailer.sendMail({
         from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@databridge.app',
         to: email,
-        subject: 'DataBridge - Password Reset',
+        subject: 'TableTurn - Password Reset',
         text: `Your password reset code is: ${code}\n\nValid for 10 minutes.`,
-        html: `<h2>DataBridge Password Reset</h2><p>Your reset code: <strong style="font-size:24px">${code}</strong></p><p>Valid for 10 minutes.</p>`
+        html: `<h2>TableTurn Password Reset</h2><p>Your reset code: <strong style="font-size:24px">${code}</strong></p><p>Valid for 10 minutes.</p>`
       });
     } else {
       console.log(`[EMAIL] Would send reset code ${code} to ${email}`);
@@ -698,7 +698,7 @@ app.post('/api/stripe/create-checkout', authRequired, async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
-        price_data: { currency: 'usd', product_data: { name: `DataBridge 充值 $${amount} (+$${bonuses[amount]} 奖励)` }, unit_amount: amount * 100 },
+        price_data: { currency: 'usd', product_data: { name: `TableTurn 充值 $${amount} (+$${bonuses[amount]} 奖励)` }, unit_amount: amount * 100 },
         quantity: 1
       }],
       mode: 'payment',
@@ -1114,10 +1114,10 @@ app.get('/api/users/me/referral', authRequired, (req, res) => {
 // ═══════════════ Template Marketplace ═══════════════
 const TEMPLATES_FILE = path.join(DATA_DIR, 'templates.json');
 if (!fs.existsSync(TEMPLATES_FILE)) fs.writeFileSync(TEMPLATES_FILE, JSON.stringify([
-  { id:'tpl_clean', name:'通用数据清洗', author:'DataBridge', category:'clean', desc:'去空格 · 公司名标准化 · 邮箱修复', rules:{action:'clean',instruction:'去除首尾多余空格，统一公司后缀格式，修复错误邮箱'}, downloads:128, featured:true },
-  { id:'tpl_trans', name:'英文→中文翻译', author:'DataBridge', category:'translate', desc:'产品描述翻译，保留技术术语', rules:{action:'translate',sourceLang:'EN',targetLang:'ZH'}, downloads:95, featured:true },
-  { id:'tpl_crm', name:'CRM 数据标准化', author:'DataBridge', category:'both', desc:'清洗+翻译：公司名、职位、地址', rules:{action:'both',instruction:'去除空格，标准化公司名，翻译英文内容',sourceLang:'EN',targetLang:'ZH'}, downloads:67, featured:false },
-  { id:'tpl_ecom', name:'电商产品处理', author:'DataBridge', category:'both', desc:'清洗SKU，翻译产品标题和描述', rules:{action:'both',instruction:'标准化SKU格式',sourceLang:'EN',targetLang:'ZH'}, downloads:42, featured:false }
+  { id:'tpl_clean', name:'通用数据清洗', author:'TableTurn', category:'clean', desc:'去空格 · 公司名标准化 · 邮箱修复', rules:{action:'clean',instruction:'去除首尾多余空格，统一公司后缀格式，修复错误邮箱'}, downloads:128, featured:true },
+  { id:'tpl_trans', name:'英文→中文翻译', author:'TableTurn', category:'translate', desc:'产品描述翻译，保留技术术语', rules:{action:'translate',sourceLang:'EN',targetLang:'ZH'}, downloads:95, featured:true },
+  { id:'tpl_crm', name:'CRM 数据标准化', author:'TableTurn', category:'both', desc:'清洗+翻译：公司名、职位、地址', rules:{action:'both',instruction:'去除空格，标准化公司名，翻译英文内容',sourceLang:'EN',targetLang:'ZH'}, downloads:67, featured:false },
+  { id:'tpl_ecom', name:'电商产品处理', author:'TableTurn', category:'both', desc:'清洗SKU，翻译产品标题和描述', rules:{action:'both',instruction:'标准化SKU格式',sourceLang:'EN',targetLang:'ZH'}, downloads:42, featured:false }
 ], null, 2));
 
 app.get('/api/templates', (req, res) => {
@@ -1138,8 +1138,8 @@ app.post('/api/templates', authRequired, (req, res) => {
 app.get('/api/airtable-script', (req, res) => {
   const baseUrl = process.env.APP_URL || 'http://localhost:3000';
   res.json({
-    script: `// DataBridge Airtable Scripting Extension\n// 在 Airtable Base → Extensions → Scripting 中粘贴此代码\n\nconst TOKEN = 'YOUR_DATABRIDGE_TOKEN';\nconst API = '${baseUrl}';\nconst TABLE = await input.tableAsync('选择表:');\nconst FIELD = await input.fieldAsync('选择要翻译的字段:', TABLE);\nconst LANG = await input.buttonsAsync('目标语言:', ['中文','English','日本語']);\nconst query = await TABLE.selectRecordsAsync();\nconst records = query.records.filter(r => r.getCellValue(FIELD));\nconst texts = records.map(r => r.getCellValueAsString(FIELD));\nconst resp = await fetch(API+'/api/execute', {\n  method:'POST',\n  headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},\n  body:JSON.stringify({action:'translate',records:texts.map((t,i)=>({id:records[i].id,[FIELD.name]:t})),fields:[FIELD.name],targetLang:LANG==='中文'?'ZH':LANG==='日本語'?'JA':'EN'})\n});\nconst data = await resp.json();\nif(data.success){\n  const updates = records.map((r,i)=>({id:r.id,fields:{[FIELD.name+' (翻译)']:data.results.translated[i]?.[FIELD.name]||''}}));\n  while(updates.length) await TABLE.updateRecordsAsync(updates.splice(0,50));\n  output.markdown('✅ 已翻译 '+records.length+' 条记录');\n}else{output.markdown('❌ '+JSON.stringify(data))}`,
-    instructions: ['1. Airtable Base → Extensions → 添加 Scripting','2. 粘贴脚本代码','3. 登录 DataBridge → F12 → Application → Local Storage → 复制 databridge_token','4. 替换 YOUR_DATABRIDGE_TOKEN','5. 点击 Run']
+    script: `// TableTurn Airtable Scripting Extension\n// 在 Airtable Base → Extensions → Scripting 中粘贴此代码\n\nconst TOKEN = 'YOUR_DATABRIDGE_TOKEN';\nconst API = '${baseUrl}';\nconst TABLE = await input.tableAsync('选择表:');\nconst FIELD = await input.fieldAsync('选择要翻译的字段:', TABLE);\nconst LANG = await input.buttonsAsync('目标语言:', ['中文','English','日本語']);\nconst query = await TABLE.selectRecordsAsync();\nconst records = query.records.filter(r => r.getCellValue(FIELD));\nconst texts = records.map(r => r.getCellValueAsString(FIELD));\nconst resp = await fetch(API+'/api/execute', {\n  method:'POST',\n  headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},\n  body:JSON.stringify({action:'translate',records:texts.map((t,i)=>({id:records[i].id,[FIELD.name]:t})),fields:[FIELD.name],targetLang:LANG==='中文'?'ZH':LANG==='日本語'?'JA':'EN'})\n});\nconst data = await resp.json();\nif(data.success){\n  const updates = records.map((r,i)=>({id:r.id,fields:{[FIELD.name+' (翻译)']:data.results.translated[i]?.[FIELD.name]||''}}));\n  while(updates.length) await TABLE.updateRecordsAsync(updates.splice(0,50));\n  output.markdown('✅ 已翻译 '+records.length+' 条记录');\n}else{output.markdown('❌ '+JSON.stringify(data))}`,
+    instructions: ['1. Airtable Base → Extensions → 添加 Scripting','2. 粘贴脚本代码','3. 登录 TableTurn → F12 → Application → Local Storage → 复制 databridge_token','4. 替换 YOUR_DATABRIDGE_TOKEN','5. 点击 Run']
   });
 });
 
@@ -1150,11 +1150,11 @@ app.get('/admin', (req, res) => {
 
 // ── Legal pages ──
 app.get('/terms', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Terms of Service — DataBridge</title>
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Terms of Service — TableTurn</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:720px;margin:40px auto;padding:0 20px;line-height:1.8;color:#111827}
 h1{font-size:24px}h2{font-size:18px;margin-top:24px}</style></head><body>
-<h1>DataBridge Terms of Service</h1><p>Last updated: June 8, 2026</p>
-<h2>1. Service</h2><p>DataBridge provides AI-powered data cleaning and translation. Users connect via Airtable PAT. Billing is usage-based.</p>
+<h1>TableTurn Terms of Service</h1><p>Last updated: June 8, 2026</p>
+<h2>1. Service</h2><p>TableTurn provides AI-powered data cleaning and translation. Users connect via Airtable PAT. Billing is usage-based.</p>
 <h2>2. User Responsibilities</h2><p>Keep your Airtable PAT and password secure. You are responsible for data legality and must not process illegal or infringing content.</p>
 <h2>3. Fees & Payment</h2><p>Translation: $2/million chars. Cleaning: $0.40/1K tokens. Prepaid balance is non-refundable (unless required by law). Balance never expires.</p>
 <h2>4. Availability</h2><p>We strive for uptime but are not liable for outages caused by third-party APIs (DeepSeek, Airtable, Stripe).</p>
@@ -1166,10 +1166,10 @@ h1{font-size:24px}h2{font-size:18px;margin-top:24px}</style></head><body>
 });
 
 app.get('/privacy', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Privacy Policy — DataBridge</title>
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Privacy Policy — TableTurn</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:720px;margin:40px auto;padding:0 20px;line-height:1.8;color:#111827}
 h1{font-size:24px}h2{font-size:18px;margin-top:24px}</style></head><body>
-<h1>DataBridge Privacy Policy</h1><p>Last updated: June 8, 2026</p>
+<h1>TableTurn Privacy Policy</h1><p>Last updated: June 8, 2026</p>
 <h2>1. What We Collect</h2><p>Email, encrypted password, top-up records, and API usage stats. We <strong>do NOT store</strong> your Airtable data content.</p>
 <h2>2. Where Your Data Lives</h2><p>Account data is stored on secure servers (Render, Singapore region). Payment processing is handled by Stripe — we never see or store your credit card.</p>
 <h2>3. Your Airtable PAT</h2><p><strong>Your PAT stays in your browser and is never uploaded to our server.</strong> It is stored only in your browser's localStorage and transmitted directly to Airtable's API. You can remove it at any time by clearing your browser data or logging out.</p>
@@ -1199,7 +1199,7 @@ module.exports = app;
 // Only listen when running directly (not on Vercel)
 if (require.main === module) {
 app.listen(PORT, () => {
-  console.log(`\n🚀 DataBridge running at http://localhost:${PORT}`);
+  console.log(`\n🚀 TableTurn running at http://localhost:${PORT}`);
   if (DEMO_MODE) {
     console.log('🎭 DEMO MODE — no API keys, using mock');
     console.log('   Set DEEPSEEK_API_KEY in .env → auto-switch to real AI');
