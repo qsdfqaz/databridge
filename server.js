@@ -25,6 +25,17 @@ const mailer = process.env.SMTP_HOST
     })
   : null;
 
+// Trust Railway/cloud proxy for correct client IP (required for rate limiting)
+app.set('trust proxy', 1);
+
+// Redirect HTTP → HTTPS in production (Railway/cloud serve HTTPS, this handles direct HTTP)
+app.use((req, res, next) => {
+  if (req.headers['x-forwarded-proto'] === 'http') {
+    return res.redirect(301, 'https://' + req.headers.host + req.url);
+  }
+  next();
+});
+
 app.use(cors());
 // Stripe webhook needs raw body BEFORE json parsing
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
@@ -42,8 +53,12 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
 const DEEPL_KEY = process.env.DEEPL_API_KEY || '';
 
-// JWT secret
-const JWT_SECRET = process.env.JWT_SECRET || require('crypto').randomBytes(32).toString('hex');
+// JWT secret — set JWT_SECRET in env for production persistence!
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  const fallback = require('crypto').randomBytes(32).toString('hex');
+  console.warn('[WARN] JWT_SECRET not set — using random value. All sessions will expire on restart.');
+  return fallback;
+})();
 const JWT_EXPIRY = '7d';
 
 // ── DeepSeek-based pricing (retail: what we charge users) ──
@@ -1042,7 +1057,7 @@ app.get('/api/admin/stats', adminAuth, (req, res) => {
 // Analytics dashboard
 // Submit sitemap to search engines (runs on Railway US server)
 app.get('/api/admin/submit-sitemap', adminAuth, async (req, res) => {
-  const sitemap = 'https://airtable-plugin-proto-production.up.railway.app/sitemap.xml';
+  const sitemap = 'https://www.tturn.xyz/sitemap.xml';
   const results = {};
   try {
     const r = await fetch(`https://www.google.com/ping?sitemap=${encodeURIComponent(sitemap)}`);
@@ -1108,7 +1123,7 @@ app.get('/api/users/me/referral', authRequired, (req, res) => {
   const usage = readJSON(USAGE_FILE);
   const earned = parseFloat(usage.filter(u=>u.action==='referral_bonus'&&u.userId===req.userId).reduce((s,u)=>s+(u.cost||0),0).toFixed(2));
   const referred = Object.values(users).filter(u=>u.referredBy===user.referralCode).length;
-  res.json({ referralCode: user.referralCode, referralLink: 'https://databridge.app?ref='+user.referralCode, totalEarned: earned, referredCount: referred });
+  res.json({ referralCode: user.referralCode, referralLink: 'https://www.tturn.xyz?ref='+user.referralCode, totalEarned: earned, referredCount: referred });
 });
 
 // ═══════════════ Template Marketplace ═══════════════
