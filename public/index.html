@@ -129,7 +129,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
   <div class="hero-section" id="section-hero">
     <h1>AI-Powered <span>Data Cleaning</span><br>& Translation for Airtable</h1>
     <p class="hero-desc">Connect your Airtable base in seconds. Bulk translate, clean, and standardize your data with DeepSeek AI. No scripts, no hassle.</p>
-    <button class="btn hero-demo-btn" onclick="startDemo()">🎮 Try Live Demo — 3 Free, No Login</button>
+    <button class="btn hero-demo-btn" onclick="startDemo()">🧪 Try Live Demo — 3 Free, No Login</button>
     <p style="font-size:12px;color:var(--muted);margin-top:10px;">Sample data included · 3 free translations + 3 free cleanings · No registration</p>
   </div>
 
@@ -149,7 +149,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
       </div>
       <button class="btn btn-primary" onclick="doLogin()">Login</button>
       <p style="margin-top:10px;font-size:12px;">
-        <a href="#" onclick="showForgotPassword()" style="color:var(--accent);">Forgot password?</a>
+        <a href="javascript:void(0)" onclick="showForgotPassword()" style="color:var(--accent);">Forgot password?</a>
       </p>
     </div>
 
@@ -172,7 +172,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
     <div style="margin-top:20px; padding-top:20px; border-top:1px solid var(--border); text-align:center;">
       <p style="font-size:13px; color:var(--muted); margin-bottom:10px;">Not ready to sign up? Try the demo first</p>
       <button class="btn btn-primary" onclick="startDemo()" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);font-size:15px;padding:12px 28px;">
-        🎮 Live Demo (3 Free)
+        🧪 Live Demo (3 Free)
       </button>
       <p style="font-size:11px;color:var(--muted);margin-top:8px;">Sample data · 3 free translations & cleanings · No registration</p>
     </div>
@@ -191,7 +191,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
 
   <!-- Demo Banner (shown during demo) -->
   <div id="demo-banner" class="card hidden" style="text-align:center;background:linear-gradient(135deg,#f5f3ff,#eef2ff);border-color:#7c3aed;">
-    <span style="font-size:20px;">🎮</span>
+    <span style="font-size:20px;">🧪</span>
     <strong style="color:#7c3aed;">Demo Mode</strong>
     <span style="font-size:13px;color:var(--muted);margin-left:8px;">Sample data · Free trial · <span id="demo-counter">Translate 0/3 · Clean 0/3</span></span>
   </div>
@@ -774,8 +774,8 @@ async function startDemo() {
     document.getElementById('btn-logout').classList.remove('hidden');document.getElementById('btn-change-pwd').classList.remove('hidden');
     document.getElementById('btn-logout').textContent = 'End Demo';
     document.getElementById('btn-logout').onclick = resetDemo;
-    document.getElementById('user-email').textContent = '🎮 Demo User';
-    document.getElementById('conn-status').textContent = '🎮 Demo Data';
+    document.getElementById('user-email').textContent = '🧪 Demo User';
+    document.getElementById('conn-status').textContent = '🧪 Demo Data';
     document.getElementById('conn-status').className = 'status-badge ok';
     document.getElementById('header-base-info').textContent = '📁 Sales Leads (Sample)';
     document.getElementById('section-connect').classList.add('hidden');
@@ -793,7 +793,7 @@ async function startDemo() {
       `<span class="chip ${state.selectedFields.includes(f.name)?'selected':''}" onclick="toggleField('${f.name.replace(/'/g,"\\'")}',this)" title="${f.type}">${f.name}</span>`
     ).join('');
     renderDemoTable();
-    toast('🎮 Demo mode started! 3 free translations & cleanings');
+    toast('🧪 Demo mode started! 3 free translations & cleanings');
   } catch(e) { toast('❌ 演示启动失败: '+e.message,'error'); }
 }
 
@@ -846,7 +846,7 @@ function switchToRegister() {
 // ── Balance & Topup ──
 function updateBalance(bal) {
   const badge = document.getElementById('bal-badge');
-  if (isDemo) { badge.textContent = '🎮 Free Trial'; badge.className = 'bal-badge'; return; }
+  if (isDemo) { badge.textContent = '🧪 Free Trial'; badge.className = 'bal-badge'; return; }
   badge.textContent = '💎 $'+parseFloat(bal).toFixed(2);
   badge.className = 'bal-badge'+(parseFloat(bal)<1?' low':'');
 }
