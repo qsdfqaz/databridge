@@ -150,6 +150,28 @@ function readJSON(f) { try { return JSON.parse(fs.readFileSync(f, 'utf-8')); } c
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
+// Off-site backup: email users.json daily
+let lastEmailBackup = null;
+async function emailBackupIfNeeded() {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  if (lastEmailBackup === today || !mailer) return;
+  try {
+    const users = readJSON(USERS_FILE);
+    const reports = readJSON(REPORTS_FILE);
+    const count = Object.keys(users).length + Object.keys(reports).length;
+    if (count === 0) return;
+    await mailer.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: process.env.SMTP_USER,
+      subject: `[Backup] TableTurn ${today} — ${Object.keys(users).length} users, ${Object.keys(reports).length} reports`,
+      text: JSON.stringify({ users, reports }, null, 2)
+    });
+    lastEmailBackup = today;
+    console.log('[BACKUP] Emailed daily backup to ' + process.env.SMTP_USER);
+  } catch (e) { console.error('[BACKUP] Email failed:', e.message); }
+}
+
 function writeJSON(f, d) {
   // Write main file
   fs.writeFileSync(f, JSON.stringify(d, null, 2));
@@ -165,6 +187,8 @@ function writeJSON(f, d) {
       .sort()
       .reverse();
     backups.slice(10).forEach(b => fs.unlinkSync(path.join(BACKUP_DIR, b)));
+    // Trigger email backup
+    emailBackupIfNeeded();
   }
 }
 
@@ -1171,6 +1195,15 @@ function adminAuth(req, res, next) {
   if ((req.headers['x-admin-token'] || '') === ADMIN_PASSWORD) return next();
   res.status(401).json({ error: '管理员密码错误' });
 }
+
+// Force email backup now
+app.post('/api/admin/backups/email', adminAuth, async (req, res) => {
+  try {
+    lastEmailBackup = null; // reset to allow re-send
+    await emailBackupIfNeeded();
+    res.json({ ok: true, message: 'Backup emailed to ' + process.env.SMTP_USER });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // Backup management
 app.get('/api/admin/backups', adminAuth, (req, res) => {
