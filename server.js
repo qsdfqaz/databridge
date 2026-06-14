@@ -333,7 +333,7 @@ async function mockClean(records, instruction) {
 
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, demoBonus } = req.body;
     if (!email || !password) return res.status(400).json({ error: '邮箱和密码不能为空' });
     if (password.length < 6) return res.status(400).json({ error: '密码至少 6 位' });
 
@@ -345,10 +345,14 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     const code = generateCode();
 
+    // Demo users get $1 free credit (costs us ~$0.02 in API fees)
+    const signupBalance = demoBonus ? 1.00 : 0;
+
     users[userId] = {
-      id: userId, email, passwordHash: hash, balance: 0,
+      id: userId, email, passwordHash: hash, balance: signupBalance,
       emailVerified: false, verificationCode: code, codeExpiresAt: Date.now() + 600000,
       dailySpend: 0, monthlySpend: 0, spendResetDaily: new Date().toISOString(), spendResetMonthly: new Date().toISOString(),
+      demoSignup: !!demoBonus, hasToppedUp: false,
       createdAt: new Date().toISOString()
     };
     writeJSON(USERS_FILE, users);
@@ -357,7 +361,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     sendVerificationEmail(email, code).catch(e => console.error('Email send failed:', e.message));
 
     const token = jwt.sign({ userId, email }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
-    res.status(201).json({ token, user: { id: userId, email, balance: 0, emailVerified: false } });
+    res.status(201).json({ token, user: { id: userId, email, balance: signupBalance, emailVerified: false, demoSignup: !!demoBonus } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -707,19 +711,26 @@ app.post('/api/stripe/create-checkout', authRequired, async (req, res) => {
   try {
     if (!stripe) return res.status(500).json({ error: '支付系统未配置 (STRIPE_SECRET_KEY 未设置)' });
     const { amount } = req.body;
-    const bonuses = { 10: 2, 50: 15, 100: 40 };
-    if (!bonuses[amount]) return res.status(400).json({ error: '金额须为 $10, $50, 或 $100' });
+    if (![2, 10, 50, 100].includes(amount)) return res.status(400).json({ error: '金额须为 $2, $10, $50, 或 $100' });
+
+    const users = readJSON(USERS_FILE);
+    const user = users[req.userId];
+    const isFirstTopup = !user.hasToppedUp;
+    const standardBonuses = { 2: 0, 10: 2, 50: 15, 100: 40 };
+    let bonus = standardBonuses[amount] || 0;
+    if (isFirstTopup) bonus += parseFloat((amount * 0.5).toFixed(2));
+    const total = amount + bonus;
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
-        price_data: { currency: 'usd', product_data: { name: `TableTurn 充值 $${amount} (+$${bonuses[amount]} 奖励)` }, unit_amount: amount * 100 },
+        price_data: { currency: 'usd', product_data: { name: `TableTurn 充值 $${amount} (+$${bonus} 奖励${isFirstTopup?' 含首次充值奖励':'')})` }, unit_amount: amount * 100 },
         quantity: 1
       }],
       mode: 'payment',
       success_url: `${req.headers.origin || 'http://localhost:3000'}?topup=success`,
       cancel_url: `${req.headers.origin || 'http://localhost:3000'}?topup=cancel`,
-      metadata: { userId: req.userId, amount: String(amount), bonus: String(bonuses[amount]) }
+      metadata: { userId: req.userId, amount: String(amount), bonus: String(bonus), firstTime: String(isFirstTopup) }
     });
     res.json({ url: session.url });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -748,7 +759,7 @@ app.post('/api/stripe/webhook', async (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// ── Topup (new packages: $10/$50/$100) ──
+// ── Topup (new packages: $2/$10/$50/$100, first-time 50% bonus) ──
 app.post('/api/users/me/topup', authRequired, (req, res) => {
   try {
     const users = readJSON(USERS_FILE);
@@ -758,19 +769,29 @@ app.post('/api/users/me/topup', authRequired, (req, res) => {
 
     const { amount } = req.body;
     const ta = parseFloat(amount);
-    const bonuses = { 10: 2, 50: 15, 100: 40 };
-    if (!bonuses[ta]) return res.status(400).json({ error: '充值金额须为 $10, $50, 或 $100' });
+    if (![2, 10, 50, 100].includes(ta)) return res.status(400).json({ error: '充值金额须为 $2, $10, $50, 或 $100' });
 
-    const bonus = bonuses[ta];
+    // Standard bonuses
+    const standardBonuses = { 2: 0, 10: 2, 50: 15, 100: 40 };
+    let bonus = standardBonuses[ta] || 0;
+
+    // First-time topup: extra 50% bonus (in addition to standard)
+    const isFirstTopup = !user.hasToppedUp;
+    if (isFirstTopup) {
+      const firstTimeBonus = parseFloat((ta * 0.5).toFixed(2));
+      bonus += firstTimeBonus;
+    }
+
     const total = ta + bonus;
     user.balance = parseFloat((user.balance + total).toFixed(4));
+    user.hasToppedUp = true;
     writeJSON(USERS_FILE, users);
 
     const usage = readJSON(USAGE_FILE);
-    usage.push({ userId: req.userId, action: 'topup', details: { amount: ta, bonus }, cost: 0, timestamp: new Date().toISOString() });
+    usage.push({ userId: req.userId, action: 'topup', details: { amount: ta, bonus, firstTime: isFirstTopup }, cost: 0, timestamp: new Date().toISOString() });
     writeJSON(USAGE_FILE, usage);
 
-    res.json({ success: true, charged: ta, bonus, credited: total, newBalance: users[req.userId].balance });
+    res.json({ success: true, charged: ta, bonus, credited: total, newBalance: users[req.userId].balance, firstTime: isFirstTopup });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
@@ -1261,7 +1282,8 @@ app.listen(PORT, () => {
   console.log('🔐 Auth: JWT (email + password + email verification)');
   console.log('🛡️  Rate limit: 10 req/min/user · Daily cap $50 · Monthly cap $500');
   console.log(`💰 Pricing: translate $${PRICE_TRANSLATION_PER_M}/M chars (~￥1/50万字) · clean $${PRICE_CLEAN_PER_1K_TOKENS}/1K tokens`);
-  console.log(`💳 Topup: $10 (+$2) | $50 (+$15) | $100 (+$40)`);
+  console.log(`💳 Topup: $2 (trial) | $10 (+$2) | $50 (+$15) | $100 (+$40) — first-time +50% bonus`);
+  console.log(`🎁 Demo signup: $1 free credit`);
   console.log(`💳 Stripe: ${stripe ? '✅ configured' : '❌ NOT SET (simulated checkout)'}`);
   console.log(`📧 Email: ${mailer ? '✅ SMTP configured' : '❌ NOT SET (verification skipped)'}`);
 });

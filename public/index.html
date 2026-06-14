@@ -328,10 +328,12 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
   <div class="modal">
     <h4>💎 Top Up Credits · 充越多送越多</h4>
     <p class="desc">Balance never expires. Translate $2/M chars · Clean $0.40/K token</p>
+    <p style="font-size:12px;color:var(--green);margin-bottom:12px;" id="first-topup-hint" class="hidden">🎁 First topup: get <strong>50% extra bonus!</strong></p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-      <div onclick="selectTopup(10)" class="topup-opt" data-amount="10" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer"><strong>$10</strong><br><span style="font-size:11px;color:var(--green)">到账 $12（送 $2）</span></div>
-      <div onclick="selectTopup(50)" class="topup-opt selected" data-amount="50" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--green);border-radius:var(--radius-sm);text-align:center;cursor:pointer;background:var(--green-bg)"><strong>$50</strong><br><span style="font-size:11px;color:var(--green);font-weight:700">🔥 超值！到账 $65（送 $15）</span></div>
-      <div onclick="selectTopup(100)" class="topup-opt" data-amount="100" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer"><strong>$100</strong><br><span style="font-size:11px;color:var(--green);font-weight:700">🚀 最超值！到账 $140（送 $40）</span></div>
+      <div onclick="selectTopup(2)" class="topup-opt" data-amount="2" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer"><strong>$2</strong><br><span style="font-size:11px;color:var(--muted);">试用 · 到账 $2</span></div>
+      <div onclick="selectTopup(10)" class="topup-opt selected" data-amount="10" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--green);border-radius:var(--radius-sm);text-align:center;cursor:pointer;background:var(--green-bg)"><strong>$10</strong><br><span style="font-size:11px;color:var(--green);">到账 $12（送 $2）</span></div>
+      <div onclick="selectTopup(50)" class="topup-opt" data-amount="50" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer"><strong>$50</strong><br><span style="font-size:11px;color:var(--green);font-weight:700">🔥 到账 $65（送 $15）</span></div>
+      <div onclick="selectTopup(100)" class="topup-opt" data-amount="100" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer"><strong>$100</strong><br><span style="font-size:11px;color:var(--green);font-weight:700">🚀 到账 $140（送 $40）</span></div>
     </div>
     <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal('modal-topup')">取消</button><button class="btn btn-outline" onclick="doTopup()" style="background:var(--green);color:#fff;border-color:var(--green);">💳 Stripe 支付</button></div>
   </div>
@@ -341,25 +343,25 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
 <div class="modal-overlay hidden" id="modal-upgrade">
   <div class="modal" style="text-align:center;">
     <div style="font-size:48px;margin-bottom:12px;">🎉</div>
-    <h4>效果满意吗？</h4>
-    <p class="desc">You've tried TableTurn. Ready for more?<br>Register to connect your own Airtable base with real data.</p>
+    <h4>You've used your 3 free trials</h4>
+    <p class="desc">Sign up now and get <strong style="color:var(--green);">$1 free credit</strong> — enough to translate <strong>500K characters</strong>.<br><span style="font-size:11px;color:var(--muted);">That's about 300 pages of text. No credit card required.</span></p>
     <div style="display:flex;gap:10px;margin:16px 0;justify-content:center;">
       <div style="text-align:center;padding:12px 16px;background:var(--green-bg);border-radius:var(--radius-sm);">
-        <div style="font-size:20px;font-weight:800;color:var(--green);">$2/M</div>
-        <div style="font-size:11px;color:var(--muted);">Translation / M chars</div>
+        <div style="font-size:20px;font-weight:800;color:var(--green);">$1 FREE</div>
+        <div style="font-size:11px;color:var(--muted);">Signup credit</div>
       </div>
       <div style="text-align:center;padding:12px 16px;background:var(--accent-light);border-radius:var(--radius-sm);">
-        <div style="font-size:20px;font-weight:800;color:var(--accent);">$0.40/K</div>
-        <div style="font-size:11px;color:var(--muted);">Cleaning / K tokens</div>
+        <div style="font-size:20px;font-weight:800;color:var(--accent);">Pay-as-you-go</div>
+        <div style="font-size:11px;color:var(--muted);">No subscription</div>
       </div>
       <div style="text-align:center;padding:12px 16px;background:var(--purple-bg);border-radius:var(--radius-sm);">
-        <div style="font-size:20px;font-weight:800;color:#7c3aed;">DeepSeek</div>
-        <div style="font-size:11px;color:var(--muted);">国内直连 AI</div>
+        <div style="font-size:20px;font-weight:800;color:#7c3aed;">DeepSeek V4</div>
+        <div style="font-size:11px;color:var(--muted);">Fast & accurate</div>
       </div>
     </div>
     <div class="modal-actions" style="justify-content:center;">
-      <button class="btn btn-outline" onclick="closeModal('modal-upgrade');resetDemo();">再试一次</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-upgrade');switchToRegister();">📝 Register Now</button>
+      <button class="btn btn-outline" onclick="closeModal('modal-upgrade');resetDemo();">Try demo again</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-upgrade');switchToRegister();" style="font-size:16px;padding:14px 32px;">📝 Sign Up — Get $1 Free</button>
     </div>
   </div>
 </div>
@@ -493,11 +495,14 @@ async function doRegister() {
   if (!email||!password) return toast('Please fill in email and password','error');
   if (password.length < 6) return toast('Password must be 6+ characters','error');
   try {
-    const res = await fetch(API+'/api/auth/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
+    var body = {email: email, password: password};
+    if (window._fromDemo) { body.demoBonus = true; window._fromDemo = false; }
+    const res = await fetch(API+'/api/auth/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
     token = data.token; user = data.user;
     localStorage.setItem('databridge_token', token);
+    if (data.user.demoSignup) { toast('🎁 $1 free credit added!', 'success'); }
     onAuthSuccess();
   } catch(e) { toast('❌ '+e.message,'error'); }
 }
@@ -989,6 +994,7 @@ function resetDemo() {
 }
 
 function switchToRegister() {
+  window._fromDemo = true;  // flag for $1 demo bonus on register
   resetDemo();
   switchAuthTab('register');
   document.getElementById('section-auth').scrollIntoView({ behavior:'smooth' });
@@ -1020,13 +1026,14 @@ async function doTopup() {
     if (!res2.ok) throw new Error((await res2.json()).error);
     const data = await res2.json();
     updateBalance(data.newBalance); closeModal('modal-topup');
-    toast(`✅ 充值 $${data.charged} + 奖励 $${data.bonus} = $${data.credited}`, 'success');
+    var msg = '✅ 充值 $' + data.charged + ' + 奖励 $' + data.bonus + ' = $' + data.credited;
+    if (data.firstTime) msg = '🎁 首次充值奖励！' + msg;
+    toast(msg, 'success');
   } catch(e) { toast('❌ '+e.message,'error'); }
 }
 
-let state2 = { topupAmount:50 };
-function selectTopup(amount) { state2.topupAmount = amount; document.querySelectorAll('.topup-opt').forEach(e=>{e.style.borderColor='var(--border)';e.style.background='';e.classList.remove('selected')}); const el=document.querySelector(`[data-amount="${amount}"]`); if(el){el.style.borderColor='var(--green)';el.style.background='var(--green-bg)';el.classList.add('selected')} }
-function showTopupModal() { document.getElementById('modal-topup').classList.remove('hidden'); }
+let state2 = { topupAmount:10 };
+function selectTopup(amount) { state2.topupAmount = amount; document.querySelectorAll('.topup-opt').forEach(function(e){e.style.borderColor='var(--border)';e.style.background='';e.classList.remove('selected');}); var el=document.querySelector('[data-amount="'+amount+'"]'); if(el){el.style.borderColor='var(--green)';el.style.background='var(--green-bg)';el.classList.add('selected');}; if (amount===2) { var hint = document.getElementById('first-topup-hint'); if(hint) hint.classList.remove('hidden'); } else { var hint2 = document.getElementById('first-topup-hint'); if(hint2) hint2.classList.add('hidden'); } }
 
 // ── Helpers ──
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
