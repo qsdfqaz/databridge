@@ -1399,7 +1399,7 @@ async function createReport() {
     var body = {
       title: title, baseId: state.baseId, tableId: document.getElementById('select-table').value,
       fields: reportFields, chartType: chartType,
-      config: { records: state.records.slice(0, 50) }
+      config: { records: state.records.slice(0, isDemo ? 500 : 5000) }
     };
     if (isDemo) body.demoSessionId = demoSid;
     var res = await api('/api/reports/create', { method: 'POST', body: JSON.stringify(body) });
@@ -1407,7 +1407,10 @@ async function createReport() {
     var report = await res.json();
     currentReportId = report.id;
     renderReportPreview(report);
-    toast('Report created! Click "My Reports" to share', 'success');
+    var msg = 'Report created!';
+    if (report.reportLimit) { msg += ' (' + report.reportLimit + '/' + report.maxReports + ' free reports used)'; }
+    if (report.reportLimit && report.reportLimit >= 8) { msg += ' — approaching limit, consider upgrading to Pro'; }
+    toast(msg, 'success');
     loadReportsList();
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -1581,6 +1584,7 @@ async function generateDocument() {
 }
 
 async function exportPDF() {
+  if (isDemo) return toast('🔒 PDF export is a Pro feature. Register and upgrade to unlock.', 'error');
   if (!currentDocHtml) return toast('Generate a document first', 'error');
   try {
     var res = await api('/api/documents/export-pdf', {
