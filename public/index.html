@@ -271,7 +271,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
     <!-- Operations -->
     <div class="card hidden" id="section-ops">
       <h3>⚡ Actions</h3>
-      <p class="desc" id="pricing-desc" style="font-size:12px;">💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>1M chars + 100K tokens included</strong>/month · Powered by DeepSeek</p><p id="demo-pricing-note" class="hidden" style="font-size:11px;color:#f59e0b;margin-top:2px;">🧪 Demo: Free, no charge — pricing applies only when using your own Airtable data</p>
+      <p class="desc" id="pricing-desc" style="font-size:12px;">💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>$9/mo</strong> (1M chars + 100K tokens) · 👥 Team: <strong>$29/mo</strong> (5 seats, shared pool) <a href="mailto:support@databridge.app" style="color:var(--accent);font-size:11px;">Contact us</a></p><p id="demo-pricing-note" class="hidden" style="font-size:11px;color:#f59e0b;margin-top:2px;">🧪 Demo: Free, no charge — pricing applies only when using your own Airtable data</p>
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px">
         <h4 style="margin-bottom:6px">🌐 Translate</h4>
         <div class="form-row">
@@ -514,7 +514,7 @@ function showLoginFromDemo() {
   if (heroBtn) heroBtn.style.display = '';
   isDemo = false; demoSid = null; state.pat = ''; state.baseId = '';
   var pd = document.getElementById('pricing-desc');
-  if (pd) { pd.style.color = ''; pd.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>1M chars + 100K tokens included</strong>/month · Powered by DeepSeek'; }
+  if (pd) { pd.style.color = ''; pd.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>$9/mo</strong> · 👥 Team: <strong>$29/mo</strong> (5 seats)'; }
   document.getElementById('tab-login').click();
   sa.scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -529,7 +529,7 @@ function showRegisterFromDemo() {
   if (heroBtn) heroBtn.style.display = '';
   isDemo = false; demoSid = null; state.pat = ''; state.baseId = '';
   var pd = document.getElementById('pricing-desc');
-  if (pd) { pd.style.color = ''; pd.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>1M chars + 100K tokens included</strong>/month · Powered by DeepSeek'; }
+  if (pd) { pd.style.color = ''; pd.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>$9/mo</strong> · 👥 Team: <strong>$29/mo</strong> (5 seats)'; }
   document.getElementById('tab-register').click();
   sa.scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -1317,7 +1317,7 @@ function resetDemo() {
   document.getElementById('bal-badge').textContent = '💎 $0.00';
   // Restore pricing text
   var pricingDesc = document.getElementById('pricing-desc');
-  if (pricingDesc) { pricingDesc.style.color = ''; pricingDesc.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>1M chars + 100K tokens included</strong>/month · Powered by DeepSeek'; }
+  if (pricingDesc) { pricingDesc.style.color = ''; pricingDesc.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>$9/mo</strong> · 👥 Team: <strong>$29/mo</strong> (5 seats)'; }
   // Clean URL hash
   if (window.location.hash === '#demo') { history.replaceState({}, '', '/'); }
   toast('Demo ended. Register to process your own data!');
@@ -1862,8 +1862,8 @@ async function deleteReport(id) {
 function showUpgradePrompt(count) {
   var modal = document.getElementById('modal-upgrade');
   var msgs = {
-    3: { title: '📊 3 Reports Created!', body: 'You\'re halfway through your free reports. Upgrade to Pro to unlock:<br><br>✅ <strong>Unlimited reports</strong><br>✅ <strong>Remove watermark</strong><br>✅ <strong>Export to PNG/PDF</strong><br>✅ <strong>AI Insights on every report</strong><br><br>Only <strong>$9/month</strong>. Cancel anytime.' },
-    5: { title: '🔒 Free Limit Reached', body: 'You\'ve used all 5 free reports.<br><br>Upgrade to Pro ($9/month) for unlimited reports, no watermark, AI insights, scheduled emails, and more.<br><br>Or delete old reports to free up space.' }
+    3: { title: '📊 3 Reports Created!', body: 'You\'re halfway through your free reports. Upgrade to Pro to unlock:<br><br>✅ <strong>Unlimited reports</strong><br>✅ <strong>Remove watermark</strong><br>✅ <strong>Export to PNG/PDF</strong><br>✅ <strong>AI Insights on every report</strong><br><br>Pro <strong>$9/month</strong> · Team <strong>$29/month</strong> (5 seats).' },
+    5: { title: '🔒 Free Limit Reached', body: 'You\'ve used all 5 free reports.<br><br>Upgrade to Pro ($9/month) for unlimited reports, or Team ($29/month) for 5 seats with shared templates & balance pool.<br><br>Or delete old reports to free up space.' }
   };
   var m = msgs[count] || msgs[5];
   modal.querySelector('h4').textContent = m.title;
