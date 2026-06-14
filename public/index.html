@@ -961,6 +961,11 @@ async function startDemo() {
     if (heroDemoBtn) heroDemoBtn.style.display = 'none';
     document.getElementById('demo-banner').classList.remove('hidden');
     document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); var backBtn = document.getElementById('btn-back-from-demo'); if (backBtn) backBtn.style.display=''; var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
+    document.getElementById('btn-dashboard').classList.remove('hidden');
+    document.getElementById('btn-reports').classList.remove('hidden');
+    document.getElementById('btn-docs').classList.remove('hidden');
+    document.getElementById('btn-templates').classList.remove('hidden');
+    document.getElementById('btn-script').classList.remove('hidden');
     document.getElementById('btn-logout').textContent = 'End Demo';
     document.getElementById('btn-logout').onclick = resetDemo;
     document.getElementById('user-email').textContent = '🧪 Demo User';
