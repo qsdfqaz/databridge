@@ -583,7 +583,11 @@ async function doRegister() {
 
 function logout() {
   token = ''; user = null; localStorage.removeItem('databridge_token');
-  document.getElementById('section-auth').classList.remove('hidden');
+  var sa = document.getElementById('section-auth');
+  sa.classList.remove('hidden'); sa.style.display = 'block';
+  document.getElementById('section-hero').classList.remove('hidden');
+  var heroBtn = document.getElementById('hero-demo-btn-main');
+  if (heroBtn) heroBtn.style.display = '';
   document.getElementById('app-sections').classList.add('hidden');
   document.getElementById('btn-logout').classList.add('hidden'); var backBtn2 = document.getElementById('btn-back-from-demo'); if (backBtn2) backBtn2.style.display='none';document.getElementById('btn-change-pwd').classList.add('hidden');
   document.getElementById('user-email').textContent = '';
@@ -1099,7 +1103,11 @@ function resetDemo() {
   document.getElementById('table-placeholder').classList.remove('hidden');
   document.getElementById('section-ops').classList.add('hidden');
   document.getElementById('section-results').classList.add('hidden');
-  document.getElementById('section-auth').classList.remove('hidden');
+  var sa = document.getElementById('section-auth');
+  sa.classList.remove('hidden'); sa.style.display = 'block';
+  document.getElementById('section-hero').classList.remove('hidden');
+  var heroBtn = document.getElementById('hero-demo-btn-main');
+  if (heroBtn) heroBtn.style.display = '';
   document.getElementById('btn-logout').classList.add('hidden'); var backBtn2 = document.getElementById('btn-back-from-demo'); if (backBtn2) backBtn2.style.display='none';document.getElementById('btn-change-pwd').classList.add('hidden');
   document.getElementById('user-email').textContent = '';
   document.getElementById('conn-status').textContent = '⚡ Disconnected';
