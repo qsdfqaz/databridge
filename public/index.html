@@ -1337,6 +1337,7 @@ function toggleReports() {
     document.getElementById('report-field-info').textContent = state.selectedFields.length + ' fields selected';
   }
   loadReportsList();
+  sec.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 function toggleDocs() {
@@ -1345,6 +1346,7 @@ function toggleDocs() {
   sec.classList.remove('hidden');
   hideOtherSections(['section-docs']);
   loadDocTemplates();
+  sec.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 function hideOtherSections(keep) {
