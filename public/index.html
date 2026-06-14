@@ -1426,7 +1426,7 @@ async function createReport() {
     var body = {
       title: title, baseId: state.baseId, tableId: document.getElementById('select-table').value,
       fields: reportFields, chartType: chartType,
-      config: { records: state.records.slice(0, isDemo ? 500 : 5000) }
+      config: { records: state.records.slice(0, isDemo ? 1000 : 5000) }
     };
     if (isDemo) body.demoSessionId = demoSid;
     var res = await api('/api/reports/create', { method: 'POST', body: JSON.stringify(body) });
@@ -1437,18 +1437,16 @@ async function createReport() {
     document.getElementById('report-schedule').classList.remove('hidden');
     var msg = 'Report created!';
     if (report.reportLimit) { msg += ' (' + report.reportLimit + '/' + report.maxReports + ' free reports used)'; }
-    if (report.reportLimit && report.reportLimit >= 8) { msg += ' — approaching limit, consider upgrading to Pro'; }
+    if (report.reportLimit && report.reportLimit >= 4) { msg += ' — approaching limit (' + report.reportLimit + '/' + report.maxReports + '), consider upgrading to Pro'; }
     toast(msg, 'success');
     loadReportsList();
     // Fetch AI insights in background
     fetchReportInsights(report.id);
     // Milestone prompts
-    if (report.reportLimit === 5) {
+    if (report.reportLimit === 3) {
+      setTimeout(function() { showUpgradePrompt(3); }, 2000);
+    } else if (report.reportLimit === 5) {
       setTimeout(function() { showUpgradePrompt(5); }, 2000);
-    } else if (report.reportLimit === 8) {
-      setTimeout(function() { showUpgradePrompt(8); }, 2000);
-    } else if (report.reportLimit === 10) {
-      setTimeout(function() { showUpgradePrompt(10); }, 2000);
     }
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -1632,9 +1630,8 @@ async function deleteReport(id) {
 function showUpgradePrompt(count) {
   var modal = document.getElementById('modal-upgrade');
   var msgs = {
-    5: { title: '📊 5 Reports Created!', body: 'You\'ve created 5 reports. Upgrade to Pro to unlock:<br><br>✅ <strong>Unlimited reports</strong><br>✅ <strong>Remove watermark</strong><br>✅ <strong>Export to PNG/PDF</strong><br>✅ <strong>Real-time data refresh</strong><br><br>Only <strong>$9/month</strong>. Cancel anytime.' },
-    8: { title: '⚠️ Almost at the limit', body: 'You have <strong>2 reports left</strong> before hitting the free limit.<br><br>Upgrade to Pro now and keep all your reports — plus get watermark-free charts, PDF exports, and unlimited sharing.' },
-    10: { title: '🔒 Free Limit Reached', body: 'You\'ve used all 10 free reports.<br><br>Upgrade to Pro ($9/month) for unlimited reports, no watermark, and premium features.<br><br>Or delete old reports to free up space.' }
+    3: { title: '📊 3 Reports Created!', body: 'You\'re halfway through your free reports. Upgrade to Pro to unlock:<br><br>✅ <strong>Unlimited reports</strong><br>✅ <strong>Remove watermark</strong><br>✅ <strong>Export to PNG/PDF</strong><br>✅ <strong>AI Insights on every report</strong><br><br>Only <strong>$9/month</strong>. Cancel anytime.' },
+    5: { title: '🔒 Free Limit Reached', body: 'You\'ve used all 5 free reports.<br><br>Upgrade to Pro ($9/month) for unlimited reports, no watermark, AI insights, scheduled emails, and more.<br><br>Or delete old reports to free up space.' }
   };
   var m = msgs[count] || msgs[5];
   modal.querySelector('h4').textContent = m.title;
@@ -1642,8 +1639,8 @@ function showUpgradePrompt(count) {
   // Update buttons
   var btns = modal.querySelectorAll('.modal-actions button');
   if (btns.length >= 2) {
-    btns[0].textContent = count >= 10 ? 'Delete old reports' : 'Maybe later';
-    btns[0].onclick = function() { closeModal('modal-upgrade'); if (count >= 10) { toggleReports(); } };
+    btns[0].textContent = count >= 5 ? 'Delete old reports' : 'Maybe later';
+    btns[0].onclick = function() { closeModal('modal-upgrade'); if (count >= 5) { toggleReports(); } };
     btns[1].textContent = '🚀 Upgrade to Pro — $9/month';
     btns[1].onclick = function() { closeModal('modal-upgrade'); showTopupModal(); };
   }

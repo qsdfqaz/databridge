@@ -1347,9 +1347,9 @@ app.post('/api/reports/create', (req, res) => {
     // ── Abuse prevention ──
     const userReports = Object.values(reports).filter(r => r.userId === userId);
 
-    // Limit: max 10 reports for free/demo users
-    if (isDemo && userReports.length >= 10) {
-      return res.status(429).json({ error: 'Free limit reached (10 reports). Please delete old reports or upgrade to Pro.' });
+    // Limit: max 5 reports for free/demo users
+    if (isDemo && userReports.length >= 5) {
+      return res.status(429).json({ error: 'Free limit reached (5 reports). Please delete old reports or upgrade to Pro for unlimited.' });
     }
 
     // Rate limit: 5 reports per hour per user
@@ -1359,10 +1359,10 @@ app.post('/api/reports/create', (req, res) => {
       return res.status(429).json({ error: 'Rate limit: 5 reports per hour. Please wait or upgrade to Pro.' });
     }
 
-    // Row limit: 500 rows for free/demo users
+    // Row limit: 1000 rows for free/demo users
     const recordCount = (config?.records || []).length;
-    if (isDemo && recordCount > 500) {
-      return res.status(400).json({ error: 'Free reports limited to 500 rows. Upgrade to Pro for unlimited data.' });
+    if (isDemo && recordCount > 1000) {
+      return res.status(400).json({ error: 'Free reports limited to 1,000 rows. Upgrade to Pro for unlimited data.' });
     }
 
     const id = 'rpt_' + Date.now().toString(36);
@@ -1373,7 +1373,7 @@ app.post('/api/reports/create', (req, res) => {
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
     };
     writeJSON(REPORTS_FILE, reports);
-    res.status(201).json(Object.assign(reports[id], { reportLimit: isDemo ? userReports.length + 1 : null, maxReports: isDemo ? 10 : null, rowLimit: isDemo ? 500 : null }));
+    res.status(201).json(Object.assign(reports[id], { reportLimit: isDemo ? userReports.length + 1 : null, maxReports: isDemo ? 5 : null, rowLimit: isDemo ? 1000 : null }));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
