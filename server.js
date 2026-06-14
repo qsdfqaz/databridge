@@ -353,6 +353,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       emailVerified: false, verificationCode: code, codeExpiresAt: Date.now() + 600000,
       dailySpend: 0, monthlySpend: 0, spendResetDaily: new Date().toISOString(), spendResetMonthly: new Date().toISOString(),
       demoSignup: !!demoBonus, hasToppedUp: false,
+      proPlan: null, proCreditsTranslate: 0, proCreditsClean: 0, proCreditsReset: null,
       createdAt: new Date().toISOString()
     };
     writeJSON(USERS_FILE, users);
@@ -380,7 +381,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     if (!valid) return res.status(401).json({ error: '邮箱或密码错误' });
 
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
-    res.json({ token, user: { id: user.id, email: user.email, balance: user.balance } });
+    res.json({ token, user: { id: user.id, email: user.email, balance: user.balance, proPlan: user.proPlan, proCreditsTranslate: user.proCreditsTranslate, proCreditsClean: user.proCreditsClean } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -390,7 +391,7 @@ app.get('/api/auth/me', authRequired, (req, res) => {
   const users = readJSON(USERS_FILE);
   const user = users[req.userId];
   if (!user) return res.status(404).json({ error: '用户不存在' });
-  res.json({ id: user.id, email: user.email, balance: user.balance, emailVerified: user.emailVerified, createdAt: user.createdAt });
+  res.json({ id: user.id, email: user.email, balance: user.balance, emailVerified: user.emailVerified, createdAt: user.createdAt, proPlan: user.proPlan, proCreditsTranslate: user.proCreditsTranslate, proCreditsClean: user.proCreditsClean });
 });
 
 // Email verification
@@ -631,12 +632,38 @@ app.post('/api/execute', authRequired, executeLimiter, async (req, res) => {
     // 3. Check email verified
     if (!user.emailVerified) return res.status(403).json({ error: '请先验证邮箱后再使用', emailNotVerified: true });
 
-    // 4. Check balance BEFORE calling APIs
-    if (user.balance < finalCost) {
-      return res.status(402).json({ error: '余额不足', required: finalCost, balance: user.balance, shortfall: parseFloat((finalCost - user.balance).toFixed(4)) });
+    // 4. Pro credits: reset monthly if needed
+    if (user.proPlan && user.proCreditsReset) {
+      const resetDate = new Date(user.proCreditsReset);
+      if (now > resetDate) {
+        user.proCreditsTranslate = 1000000; // 1M chars free/month
+        user.proCreditsClean = 100000;       // 100K tokens free/month
+        user.proCreditsReset = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+      }
     }
 
-    // 3. Execute
+    // 5. Deduct from Pro credits first, then balance
+    let costCoveredByPro = 0;
+    if (user.proPlan && (action === 'translate' || action === 'both')) {
+      const charsNeeded = (action === 'translate' || action === 'both') ? finalCost / PRICE_TRANSLATION_PER_M * 1000000 : 0;
+      // Pro covers up to remaining credits
+      const covered = Math.min(charsNeeded, user.proCreditsTranslate || 0);
+      costCoveredByPro += (covered / 1000000) * PRICE_TRANSLATION_PER_M;
+      user.proCreditsTranslate = Math.max(0, (user.proCreditsTranslate || 0) - covered);
+    }
+    if (user.proPlan && (action === 'clean' || action === 'both')) {
+      const tokensNeeded = (action === 'clean' || action === 'both') ? finalCost / PRICE_CLEAN_PER_1K_TOKENS * 1000 : 0;
+      const covered = Math.min(tokensNeeded, user.proCreditsClean || 0);
+      costCoveredByPro += (covered / 1000) * PRICE_CLEAN_PER_1K_TOKENS;
+      user.proCreditsClean = Math.max(0, (user.proCreditsClean || 0) - covered);
+    }
+
+    const remainingCost = parseFloat((finalCost - costCoveredByPro).toFixed(4));
+    if (remainingCost > 0 && user.balance < remainingCost) {
+      return res.status(402).json({ error: '余额不足', required: remainingCost, balance: user.balance, proCreditsUsed: parseFloat(costCoveredByPro.toFixed(4)), shortfall: parseFloat((remainingCost - user.balance).toFixed(4)) });
+    }
+
+    // 6. Execute
     const results = { cleaned: {}, translated: {} };
 
     if (action === 'translate' || action === 'both') {
@@ -659,8 +686,8 @@ app.post('/api/execute', authRequired, executeLimiter, async (req, res) => {
       r.cleaned.forEach((c, i) => { if (!results.cleaned[i]) results.cleaned[i] = {}; Object.assign(results.cleaned[i], c); });
     }
 
-    // 5. Deduct & track spending
-    user.balance = parseFloat((user.balance - finalCost).toFixed(4));
+    // 7. Deduct & track spending
+    user.balance = parseFloat((user.balance - remainingCost).toFixed(4));
     user.dailySpend = parseFloat(((user.dailySpend || 0) + finalCost).toFixed(4));
     user.monthlySpend = parseFloat(((user.monthlySpend || 0) + finalCost).toFixed(4));
 
@@ -679,7 +706,7 @@ app.post('/api/execute', authRequired, executeLimiter, async (req, res) => {
       console.log(`[MARGIN] User ${req.userId}: retail $${finalCost} - wholesale $${wholesaleCost} = margin below 20%`);
     }
 
-    res.json({ success: true, cost: finalCost, newBalance: user.balance, backend: LLM_BACKEND, results });
+    res.json({ success: true, cost: finalCost, proCreditsUsed: parseFloat(costCoveredByPro.toFixed(4)), remainingCost, newBalance: user.balance, backend: LLM_BACKEND, results, proPlan: user.proPlan, proCreditsLeft: user.proPlan ? { translate: user.proCreditsTranslate, clean: user.proCreditsClean } : null });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -757,6 +784,38 @@ app.post('/api/stripe/webhook', async (req, res) => {
     }
     res.json({ received: true });
   } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ── Pro Plan (monthly subscription, $9/month) ──
+app.post('/api/users/me/upgrade-pro', authRequired, (req, res) => {
+  try {
+    const users = readJSON(USERS_FILE);
+    const user = users[req.userId];
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+
+    const now = new Date();
+    user.proPlan = 'pro_monthly';
+    user.proCreditsTranslate = 1000000;  // 1M chars/month
+    user.proCreditsClean = 100000;       // 100K tokens/month
+    user.proCreditsReset = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+    writeJSON(USERS_FILE, users);
+
+    res.json({ success: true, proPlan: user.proPlan, proCreditsTranslate: user.proCreditsTranslate, proCreditsClean: user.proCreditsClean, message: 'Upgraded to Pro! $9/month. 1M chars translate + 100K tokens clean included.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/users/me/cancel-pro', authRequired, (req, res) => {
+  try {
+    const users = readJSON(USERS_FILE);
+    const user = users[req.userId];
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+    user.proPlan = null;
+    user.proCreditsTranslate = 0;
+    user.proCreditsClean = 0;
+    user.proCreditsReset = null;
+    writeJSON(USERS_FILE, users);
+    res.json({ success: true, message: 'Pro cancelled. You can still use pay-as-you-go credits.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ── Topup (new packages: $2/$10/$50/$100, first-time 50% bonus) ──

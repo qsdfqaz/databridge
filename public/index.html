@@ -233,7 +233,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
     <!-- Operations -->
     <div class="card hidden" id="section-ops">
       <h3>⚡ Actions</h3>
-      <p class="desc" id="pricing-desc" style="font-size:12px;">💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · Powered by DeepSeek</p><p id="demo-pricing-note" class="hidden" style="font-size:11px;color:#f59e0b;margin-top:2px;">🧪 Demo: Free, no charge — pricing applies only when using your own Airtable data</p>
+      <p class="desc" id="pricing-desc" style="font-size:12px;">💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>1M chars + 100K tokens included</strong>/month · Powered by DeepSeek</p><p id="demo-pricing-note" class="hidden" style="font-size:11px;color:#f59e0b;margin-top:2px;">🧪 Demo: Free, no charge — pricing applies only when using your own Airtable data</p>
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px">
         <h4 style="margin-bottom:6px">🌐 Translate</h4>
         <div class="form-row">
@@ -462,7 +462,7 @@ function showLoginFromDemo() {
   if (heroBtn) heroBtn.style.display = '';
   isDemo = false; demoSid = null; state.pat = ''; state.baseId = '';
   var pd = document.getElementById('pricing-desc');
-  if (pd) { pd.style.color = ''; pd.textContent = '💰 Translate $2/M chars · Clean $0.40/1K tokens · Powered by DeepSeek'; }
+  if (pd) { pd.style.color = ''; pd.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>1M chars + 100K tokens included</strong>/month · Powered by DeepSeek'; }
   document.getElementById('tab-login').click();
   sa.scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -477,7 +477,7 @@ function showRegisterFromDemo() {
   if (heroBtn) heroBtn.style.display = '';
   isDemo = false; demoSid = null; state.pat = ''; state.baseId = '';
   var pd = document.getElementById('pricing-desc');
-  if (pd) { pd.style.color = ''; pd.textContent = '💰 Translate $2/M chars · Clean $0.40/1K tokens · Powered by DeepSeek'; }
+  if (pd) { pd.style.color = ''; pd.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>1M chars + 100K tokens included</strong>/month · Powered by DeepSeek'; }
   document.getElementById('tab-register').click();
   sa.scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -587,8 +587,9 @@ async function onAuthSuccess() {
   document.getElementById('btn-script').classList.add('hidden');
   document.getElementById('btn-logout').textContent = '退出';
   document.getElementById('btn-logout').onclick = logout;
-  document.getElementById('user-email').textContent = '👤 '+user.email;
+  document.getElementById('user-email').textContent = (user.proPlan ? '⭐ ' : '👤 ') + user.email;
   updateBalance(user.balance);
+  if (user.proPlan) { showProStatus(user); }
 
   // Check email verification
   if (user.emailVerified === false) {
@@ -827,7 +828,11 @@ async function confirmExecute() {
       throw new Error(data.error);
     }
     closeModal('modal-estimate'); state.lastResults = data.results; updateBalance(data.newBalance);
-    toast('✅ 完成！Cost: $'+data.cost.toFixed(4)+' · '+data.backend,'success');
+    var toastMsg = '✅ 完成！';
+    if (data.proCreditsUsed > 0) { toastMsg += ' Pro credits covered: $' + data.proCreditsUsed.toFixed(4) + '. '; }
+    if (data.remainingCost > 0) { toastMsg += ' Charged: $' + data.remainingCost.toFixed(4) + '. '; }
+    toastMsg += data.backend;
+    toast(toastMsg, 'success');
     showResults(data);
   } catch(e) { toast('❌ '+e.message,'error'); }
   document.getElementById('btn-est-confirm').disabled = false;
@@ -1069,7 +1074,7 @@ function resetDemo() {
   document.getElementById('bal-badge').textContent = '💎 $0.00';
   // Restore pricing text
   var pricingDesc = document.getElementById('pricing-desc');
-  if (pricingDesc) { pricingDesc.style.color = ''; pricingDesc.textContent = '💰 Translate $2/M chars · Clean $0.40/1K tokens · Powered by DeepSeek'; }
+  if (pricingDesc) { pricingDesc.style.color = ''; pricingDesc.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>1M chars + 100K tokens included</strong>/month · Powered by DeepSeek'; }
   // Clean URL hash
   if (window.location.hash === '#demo') { history.replaceState({}, '', '/'); }
   toast('Demo ended. Register to process your own data!');
@@ -1088,6 +1093,17 @@ function updateBalance(bal) {
   if (isDemo) { badge.textContent = '🧪 Free Trial'; badge.className = 'bal-badge'; return; }
   badge.textContent = '💎 $'+parseFloat(bal).toFixed(2);
   badge.className = 'bal-badge'+(parseFloat(bal)<1?' low':'');
+}
+
+function showProStatus(u) {
+  var disp = document.getElementById('balance-display');
+  if (disp && u.proPlan) {
+    disp.style.display = '';
+    disp.style.color = '#a78bfa';
+    var tChars = (u.proCreditsTranslate || 0) >= 1000000 ? '1M' : Math.round((u.proCreditsTranslate||0)/1000) + 'K';
+    var cTokens = (u.proCreditsClean || 0) >= 100000 ? '100K' : Math.round((u.proCreditsClean||0)/1000) + 'K';
+    disp.textContent = '⭐ Pro | Translate: ' + tChars + ' chars | Clean: ' + cTokens + ' tokens';
+  }
 }
 
 function showTopupModal() {
