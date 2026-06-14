@@ -1541,6 +1541,52 @@ app.post('/api/notion/write', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ═══════════════ Google Sheets Integration ═══════════════
+app.post('/api/gsheets/read', async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'Google Sheets URL required' });
+    // Extract sheet ID from various URL formats
+    let sheetId = '';
+    const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (m) sheetId = m[1];
+    if (!sheetId) return res.status(400).json({ error: 'Invalid Google Sheets URL. Expected /d/SHEET_ID/ in URL.' });
+
+    const gid = (url.match(/gid=(\d+)/) || [])[1] || '0';
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+    const r = await fetch(csvUrl, { headers: { 'User-Agent': 'TableTurn/1.0' } });
+    if (!r.ok) return res.status(400).json({ error: 'Failed to read sheet. Make sure it is published or shared publicly (File → Share → Publish to web).' });
+    const csvText = await r.text();
+    // Parse CSV
+    const Papa = require('papaparse');
+    const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true, trimHeaders: true });
+    const records = parsed.data.filter(row => Object.values(row).some(v => v !== '' && v !== null));
+    if (!records.length) return res.status(400).json({ error: 'No data found in sheet' });
+    const fields = Object.keys(records[0]).map(name => ({ id: 'fld_' + name, name, type: 'singleLineText' }));
+    res.json({ records, fields, sheetId, rowCount: records.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Write-back to Google Sheets (creates a new CSV for download since direct API write requires OAuth)
+app.post('/api/gsheets/write', async (req, res) => {
+  try {
+    const { records, fields } = req.body;
+    if (!records?.length) return res.status(400).json({ error: 'No records to export' });
+    // Generate CSV
+    const headers = fields || Object.keys(records[0]);
+    let csv = headers.join(',') + '\n';
+    records.forEach(r => {
+      csv += headers.map(h => {
+        const v = String(r[h] || '').replace(/"/g, '""');
+        return v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v}"` : v;
+      }).join(',') + '\n';
+    });
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="TableTurn_export.csv"');
+    res.send(csv);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ═══════════════ Reports (TableDash) ═══════════════
 const REPORTS_FILE = path.join(DATA_DIR, 'reports.json');
 if (!fs.existsSync(REPORTS_FILE)) fs.writeFileSync(REPORTS_FILE, '{}');
@@ -1800,14 +1846,8 @@ button{padding:10px 20px;background:#7c3aed;color:#fff;border:none;border-radius
     }
   }
 
-  // Track view count
+  // Track view count (analytics only, no limit)
   report.viewCount = (report.viewCount || 0) + 1;
-  if (report.maxViews && report.viewCount > report.maxViews) {
-    return res.status(429).send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="robots" content="noindex,nofollow"><title>Link Limit Reached</title>
-<style>body{font-family:-apple-system,sans-serif;background:#0a0a0f;color:#e8e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center}
-.btn{display:inline-block;padding:12px 24px;background:#7c3aed;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px}</style></head>
-<body><div><h2>📊 Link limit reached</h2><p style="color:#8888aa">This report has exceeded ${report.maxViews} views this month.</p><p style="color:#8888aa">Ask the owner to upgrade to TableTurn Pro for unlimited sharing.</p><a class="btn" href="https://www.tturn.xyz">Try TableTurn</a></div></body></html>`);
-  }
   writeJSON(REPORTS_FILE, reports);
 
   // Check if report belongs to a free/demo user → show upgrade CTA

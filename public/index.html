@@ -220,6 +220,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
       <h3>Connect Data Source</h3>
       <div style="display:flex;gap:0;margin-bottom:20px;">
         <button class="btn btn-sm" id="tab-source-airtable" onclick="switchDataSource('airtable')" style="border-radius:8px 0 0 8px;background:var(--accent-light);border-color:var(--accent);color:var(--accent);">📡 Airtable</button>
+        <button class="btn btn-sm btn-outline" id="tab-source-gsheets" onclick="switchDataSource('gsheets')" style="border-radius:0;">📊 Google Sheets</button>
         <button class="btn btn-sm btn-outline" id="tab-source-file" onclick="switchDataSource('file')" style="border-radius:0 8px 8px 0;">📂 Upload CSV/Excel</button>
         <!-- Notion OAuth coming soon -->
       </div>
@@ -244,6 +245,15 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
         </div>
         <div id="file-preview" class="hidden" style="margin-top:12px;"></div>
         <p style="font-size:11px;color:var(--muted);margin-top:4px;">🔒 File processed locally in your browser — never uploaded to our server</p>
+      </div>
+      <div id="source-gsheets" class="hidden">
+        <p class="desc">Paste a Google Sheets URL to load your data</p>
+        <div class="form-row">
+          <div class="form-group" style="flex:1;min-width:300px;"><label>Google Sheets URL</label><input type="text" id="input-gsheets-url" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+          <div class="form-group" style="justify-content:end"><button class="btn btn-primary" id="btn-gsheets-load" onclick="loadGoogleSheet()">Load Sheet</button></div>
+        </div>
+        <p style="font-size:11px;color:var(--muted);">Make sure your sheet is published: File → Share → <strong>Publish to web</strong> (CSV format). <a href="https://support.google.com/docs/answer/183965" target="_blank" style="color:var(--accent);">How to publish ↗</a></p>
+        <p style="font-size:11px;color:var(--accent);">🔒 Read-only access — we never store or modify your Google Sheets data.</p>
       </div>
       <div id="source-notion" class="hidden">
         <p class="desc">Connect your Notion database with an Internal Integration Token</p>
@@ -735,8 +745,9 @@ function switchDataSource(source) {
   currentDataSource = source;
   document.getElementById('source-airtable').classList.toggle('hidden', source !== 'airtable');
   document.getElementById('source-file').classList.toggle('hidden', source !== 'file');
+  document.getElementById('source-gsheets').classList.toggle('hidden', source !== 'gsheets');
   document.getElementById('source-notion').classList.toggle('hidden', source !== 'notion');
-  ['airtable','file','notion'].forEach(function(s) {
+  ['airtable','file','gsheets','notion'].forEach(function(s) {
     var tab = document.getElementById('tab-source-' + s);
     if (!tab) return;
     var active = source === s;
@@ -884,6 +895,48 @@ function handleFileUpload(file) {
   };
   if (ext === 'csv') { reader.readAsText(file); }
   else { reader.readAsArrayBuffer(file); }
+}
+
+// ── Google Sheets ──
+async function loadGoogleSheet() {
+  var url = document.getElementById('input-gsheets-url').value.trim();
+  if (!url) return toast('Paste a Google Sheets URL','error');
+  var btn = document.getElementById('btn-gsheets-load');
+  btn.disabled = true; btn.textContent = 'Loading...';
+  try {
+    var res = await fetch('/api/gsheets/read', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url}) });
+    if (!res.ok) { var e = await res.json(); throw new Error(e.error); }
+    var data = await res.json();
+
+    state.pat = 'gsheets'; state.baseId = data.sheetId;
+    state.records = data.records;
+    state.fields = data.fields;
+    state.selectedFields = data.fields.map(function(f) { return f.name; }).slice(0, 5);
+
+    document.getElementById('conn-status').textContent = '📊 Sheets Loaded';
+    document.getElementById('conn-status').className = 'status-badge ok';
+    document.getElementById('header-base-info').textContent = '📁 Google Sheets';
+    document.getElementById('section-table').classList.remove('hidden');
+    document.getElementById('table-placeholder').classList.add('hidden');
+    document.getElementById('section-ops').classList.remove('hidden');
+
+    document.getElementById('select-table').innerHTML = '<option value="' + data.sheetId + '">Google Sheet (' + data.rowCount + ' rows)</option>';
+    document.getElementById('field-chips').innerHTML = data.fields.map(function(f) {
+      return '<span class="chip ' + (state.selectedFields.includes(f.name) ? 'selected' : '') + '" onclick="toggleField(\'' + f.name.replace(/'/g,"\\'") + '\',this)">' + f.name + '</span>';
+    }).join('');
+
+    var keys = data.fields.map(function(f) { return f.name; }).slice(0, 8);
+    var html = '<table><thead><tr><th>#</th>' + keys.map(function(k) { return '<th>' + k + '</th>'; }).join('') + '</tr></thead><tbody>';
+    data.records.slice(0, 25).forEach(function(r, i) {
+      html += '<tr><td>' + (i+1) + '</td>' + keys.map(function(k) { return '<td>' + String(r[k]||'').slice(0, 80) + '</td>'; }).join('') + '</tr>';
+    });
+    html += '</tbody></table>';
+    document.getElementById('table-container').innerHTML = html;
+    document.getElementById('record-info').textContent = data.rowCount + ' rows · ' + data.fields.length + ' columns';
+
+    toast('Loaded ' + data.rowCount + ' rows from Google Sheets', 'success');
+  } catch(err) { toast(err.message, 'error'); }
+  btn.disabled = false; btn.textContent = 'Load Sheet';
 }
 
 // ── Connect ──
