@@ -321,7 +321,11 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
         <div class="form-group" style="flex:1;"><label>Report Title</label><input type="text" id="report-title" placeholder="e.g. Monthly Sales Overview"></div>
         <div class="form-group"><label>Chart Type</label><select id="report-chart-type"><option value="bar">Bar Chart</option><option value="line">Line Chart</option><option value="pie">Pie Chart</option><option value="table">Table View</option></select></div>
       </div>
-      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">Uses currently selected fields from the table above. <span id="report-field-info"></span></p>
+      <div class="form-row">
+        <div class="form-group" style="flex:1;"><label>X-Axis (Labels)</label><select id="report-x-field"><option>-- Select field --</option></select></div>
+        <div class="form-group" style="flex:1;"><label>Y-Axis (Values)</label><select id="report-y-field"><option>-- Select field --</option></select></div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">Select data fields above, then click Create Report. <span id="report-field-info"></span></p>
       <div id="report-preview" style="background:var(--bg);border-radius:var(--radius-sm);padding:16px;margin-bottom:12px;min-height:100px;">
         <p style="color:var(--muted);text-align:center;padding:20px;">Load data first, then click "Create Report"</p>
       </div>
@@ -457,6 +461,8 @@ function showLoginFromDemo() {
   var heroBtn = document.getElementById('hero-demo-btn-main');
   if (heroBtn) heroBtn.style.display = '';
   isDemo = false; demoSid = null; state.pat = ''; state.baseId = '';
+  var pd = document.getElementById('pricing-desc');
+  if (pd) { pd.style.color = ''; pd.textContent = '💰 Translate $2/M chars · Clean $0.40/1K tokens · Powered by DeepSeek'; }
   document.getElementById('tab-login').click();
   sa.scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -470,6 +476,8 @@ function showRegisterFromDemo() {
   var heroBtn = document.getElementById('hero-demo-btn-main');
   if (heroBtn) heroBtn.style.display = '';
   isDemo = false; demoSid = null; state.pat = ''; state.baseId = '';
+  var pd = document.getElementById('pricing-desc');
+  if (pd) { pd.style.color = ''; pd.textContent = '💰 Translate $2/M chars · Clean $0.40/1K tokens · Powered by DeepSeek'; }
   document.getElementById('tab-register').click();
   sa.scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -575,8 +583,8 @@ async function onAuthSuccess() {
   document.getElementById('btn-dashboard').classList.remove('hidden');
   document.getElementById('btn-reports').classList.remove('hidden');
   document.getElementById('btn-docs').classList.remove('hidden');
-  document.getElementById('btn-templates').classList.remove('hidden');
-  document.getElementById('btn-script').classList.remove('hidden');
+  document.getElementById('btn-templates').classList.add('hidden');
+  document.getElementById('btn-script').classList.add('hidden');
   document.getElementById('btn-logout').textContent = '退出';
   document.getElementById('btn-logout').onclick = logout;
   document.getElementById('user-email').textContent = '👤 '+user.email;
@@ -967,12 +975,14 @@ async function startDemo() {
     var heroDemoBtn = document.getElementById('hero-demo-btn-main');
     if (heroDemoBtn) heroDemoBtn.style.display = 'none';
     document.getElementById('demo-banner').classList.remove('hidden');
-    document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); var backBtn = document.getElementById('btn-back-from-demo'); if (backBtn) backBtn.style.display=''; var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
-    document.getElementById('btn-dashboard').classList.remove('hidden');
+    document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.add('hidden'); var backBtn = document.getElementById('btn-back-from-demo'); if (backBtn) backBtn.style.display=''; var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
+    // Demo mode: only show Reports/Docs as teasers, hide clutter
     document.getElementById('btn-reports').classList.remove('hidden');
     document.getElementById('btn-docs').classList.remove('hidden');
-    document.getElementById('btn-templates').classList.remove('hidden');
-    document.getElementById('btn-script').classList.remove('hidden');
+    // Hide: Usage, Templates, Script, Dashboard (not useful in demo)
+    document.getElementById('btn-dashboard').classList.add('hidden');
+    document.getElementById('btn-templates').classList.add('hidden');
+    document.getElementById('btn-script').classList.add('hidden');
     document.getElementById('btn-logout').textContent = 'End Demo';
     document.getElementById('btn-logout').onclick = resetDemo;
     document.getElementById('user-email').textContent = '🧪 Demo User';
@@ -994,7 +1004,11 @@ async function startDemo() {
       `<span class="chip ${state.selectedFields.includes(f.name)?'selected':''}" onclick="toggleField('${f.name.replace(/'/g,"\\'")}',this)" title="${f.type}">${f.name}</span>`
     ).join('');
     renderDemoTable();
-    toast('🧪 Demo mode started! 3 free translations & cleanings'); document.getElementById('demo-pricing-note').classList.remove('hidden');
+    // Gray out pricing in demo mode
+    var pricingDesc = document.getElementById('pricing-desc');
+    if (pricingDesc) { pricingDesc.style.color = 'var(--muted)'; pricingDesc.textContent = '🧪 Demo — Free, no charge · 3 translations + 3 cleanings'; }
+    document.getElementById('demo-pricing-note').classList.remove('hidden');
+    toast('🧪 Demo mode started! 3 free translations & cleanings');
     // Push history so browser back button returns to home instead of blank
     if (!window._demoHistoryPushed) { history.pushState({demo:true}, '', '#demo'); window._demoHistoryPushed = true; }
 
@@ -1053,6 +1067,9 @@ function resetDemo() {
   document.getElementById('conn-status').className = 'status-badge off';
   document.getElementById('header-base-info').textContent = '';
   document.getElementById('bal-badge').textContent = '💎 $0.00';
+  // Restore pricing text
+  var pricingDesc = document.getElementById('pricing-desc');
+  if (pricingDesc) { pricingDesc.style.color = ''; pricingDesc.textContent = '💰 Translate $2/M chars · Clean $0.40/1K tokens · Powered by DeepSeek'; }
   // Clean URL hash
   if (window.location.hash === '#demo') { history.replaceState({}, '', '/'); }
   toast('Demo ended. Register to process your own data!');
@@ -1333,8 +1350,21 @@ function toggleReports() {
   if (!sec.classList.contains('hidden')) { sec.classList.add('hidden'); return; }
   sec.classList.remove('hidden');
   hideOtherSections(['section-reports']);
-  if (state.records.length) {
-    document.getElementById('report-field-info').textContent = state.selectedFields.length + ' fields selected';
+  // Populate field selectors
+  var xSel = document.getElementById('report-x-field');
+  var ySel = document.getElementById('report-y-field');
+  if (state.records.length && state.selectedFields.length) {
+    document.getElementById('report-field-info').textContent = state.selectedFields.length + ' fields available';
+    var opts = state.selectedFields.map(function(f) { return '<option>' + f + '</option>'; }).join('');
+    xSel.innerHTML = '<option value="">-- Select label field --</option>' + opts;
+    ySel.innerHTML = '<option value="">-- Select value field --</option>' + opts;
+    // Auto-select: first field as X, first numeric-ish field as Y
+    if (state.selectedFields.length >= 1) xSel.value = state.selectedFields[0];
+    if (state.selectedFields.length >= 2) ySel.value = state.selectedFields[1];
+  } else {
+    xSel.innerHTML = '<option>-- Load data first --</option>';
+    ySel.innerHTML = '<option>-- Load data first --</option>';
+    document.getElementById('report-field-info').textContent = 'Load data via the table above first';
   }
   loadReportsList();
   sec.scrollIntoView({behavior:'smooth',block:'center'});
@@ -1356,16 +1386,19 @@ function hideOtherSections(keep) {
 }
 
 async function createReport() {
-  if (!state.records.length) return toast('Load data first','error');
-  if (!state.selectedFields.length) return toast('Select fields first','error');
+  if (!state.records.length) return toast('Load data first — go to table above','error');
+  var xField = document.getElementById('report-x-field').value;
+  var yField = document.getElementById('report-y-field').value;
+  if (!xField || !yField) return toast('Select both X-axis and Y-axis fields above','error');
   var title = document.getElementById('report-title').value.trim();
-  if (!title) title = 'Report - ' + new Date().toLocaleDateString();
+  if (!title) title = xField + ' by ' + yField;
   var chartType = document.getElementById('report-chart-type').value;
 
   try {
+    var reportFields = [xField, yField];
     var body = {
       title: title, baseId: state.baseId, tableId: document.getElementById('select-table').value,
-      fields: state.selectedFields, chartType: chartType,
+      fields: reportFields, chartType: chartType,
       config: { records: state.records.slice(0, 50) }
     };
     if (isDemo) body.demoSessionId = demoSid;
@@ -1386,38 +1419,34 @@ function renderReportPreview(report) {
   var records = (report.config && report.config.records) ? report.config.records : state.records;
   if (!records.length) { container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px;">No data</p>'; return; }
 
-  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">';
-  fields.forEach(function(f, i) {
-    var fname = typeof f === 'string' ? f : f.name || f;
-    html += '<div style="background:var(--bg);border-radius:8px;padding:12px;"><strong style="font-size:12px;color:var(--muted);">' + fname + '</strong><div style="height:200px;"><canvas id="preview-chart-' + i + '"></canvas></div></div>';
-  });
-  html += '</div>';
+  var xField = fields[0] || '';
+  var yField = fields[1] || '';
+
   if (chartType === 'table') {
-    html = '<div class="table-wrap"><table><thead><tr>' + fields.map(function(f) { return '<th>' + (typeof f === 'string' ? f : f.name || f) + '</th>'; }).join('') + '</tr></thead><tbody>';
-    records.slice(0, 10).forEach(function(r) {
-      html += '<tr>' + fields.map(function(f) { var k = typeof f === 'string' ? f : f.name || f; return '<td>' + (r[k] !== undefined ? String(r[k]).slice(0, 60) : '-') + '</td>'; }).join('') + '</tr>';
+    var html = '<div class="table-wrap"><table><thead><tr><th>' + xField + '</th><th>' + yField + '</th></tr></thead><tbody>';
+    records.slice(0, 20).forEach(function(r) {
+      html += '<tr><td>' + (r[xField] !== undefined ? String(r[xField]).slice(0, 60) : '-') + '</td><td>' + (r[yField] !== undefined ? String(r[yField]).slice(0, 60) : '-') + '</td></tr>';
     });
     html += '</tbody></table></div>';
-  }
-  container.innerHTML = html;
+    container.innerHTML = html;
+  } else {
+    var labels = records.slice(0, 30).map(function(r) { return String(r[xField] || '').slice(0, 20); });
+    var values = records.slice(0, 30).map(function(r) {
+      var v = r[yField];
+      if (typeof v === 'number') return v;
+      var n = parseFloat(v);
+      return isNaN(n) ? (typeof v === 'string' ? v.length : 0) : n;
+    });
 
-  // Render charts after DOM update
-  if (chartType !== 'table') {
+    container.innerHTML = '<div style="background:var(--bg);border-radius:8px;padding:12px;"><strong style="font-size:12px;color:var(--muted);">' + yField + ' by ' + xField + '</strong><div style="height:300px;"><canvas id="preview-chart-0"></canvas></div></div>';
+
     setTimeout(function() {
-      fields.forEach(function(f, i) {
-        var canvas = document.getElementById('preview-chart-' + i);
-        if (!canvas) return;
-        var fname = typeof f === 'string' ? f : f.name || f;
-        var labels = records.slice(0, 20).map(function(r) { return r.id ? r.id.slice(-6) : ''; });
-        var values = records.slice(0, 20).map(function(r) {
-          var v = r[fname];
-          return typeof v === 'number' ? v : (typeof v === 'string' ? v.length : 0);
-        });
-        new Chart(canvas, {
-          type: chartType,
-          data: { labels: labels, datasets: [{ label: fname, data: values, backgroundColor: 'rgba(124,58,237,0.5)', borderColor: '#7c3aed', borderWidth: 1 }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8888aa' } } }, scales: { x: { ticks: { color: '#8888aa' } }, y: { ticks: { color: '#8888aa' } } } }
-        });
+      var canvas = document.getElementById('preview-chart-0');
+      if (!canvas) return;
+      new Chart(canvas, {
+        type: chartType,
+        data: { labels: labels, datasets: [{ label: yField, data: values, backgroundColor: chartType==='pie'?['#7c3aed','#a78bfa','#10b981','#f59e0b','#ef4444','#3b82f6','#ec4899','#8b5cf6']:'rgba(124,58,237,0.5)', borderColor: '#7c3aed', borderWidth: 1 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8888aa' } } }, scales: chartType==='pie'?{}:{ x: { ticks: { color: '#8888aa', maxRotation: 45 } }, y: { ticks: { color: '#8888aa' } } } }
       });
     }, 100);
   }
