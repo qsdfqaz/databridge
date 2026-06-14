@@ -1412,7 +1412,25 @@ async function createReport() {
     if (report.reportLimit && report.reportLimit >= 8) { msg += ' — approaching limit, consider upgrading to Pro'; }
     toast(msg, 'success');
     loadReportsList();
+    // Fetch AI insights in background
+    fetchReportInsights(report.id);
   } catch(e) { toast(e.message, 'error'); }
+}
+
+async function fetchReportInsights(reportId) {
+  try {
+    var url = '/api/reports/' + reportId + '/insights';
+    var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    if (!res.ok) return;
+    var data = await res.json();
+    if (data.insights) {
+      var container = document.getElementById('report-preview');
+      var insightDiv = document.createElement('div');
+      insightDiv.style.cssText = 'margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;';
+      insightDiv.innerHTML = '<h4 style="font-size:13px;color:var(--accent);margin-bottom:6px;">🤖 AI Insights</h4><p style="font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text);">' + data.insights.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p>';
+      container.appendChild(insightDiv);
+    }
+  } catch(e) { /* silent */ }
 }
 
 function renderReportPreview(report) {
