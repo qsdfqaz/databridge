@@ -8,7 +8,7 @@
 <meta name="robots" content="index, follow">
 <meta name="msvalidate.01" content="D66D4D7AE8D71D77A7DFE8400F51FAB0">
 <meta property="og:title" content="TableTurn — AI Cleaning & Translation for Airtable">
-<meta property="og:description" content="Bulk translate and clean your Airtable data with DeepSeek AI. 3 free uses, no registration. Connects via PAT.">
+<meta property="og:description" content="Bulk translate and clean your Airtable data with DeepSeek V4 Pro. 3 free uses, no registration. Connects via PAT.">
 <meta property="og:url" content="https://www.tturn.xyz">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
@@ -16,7 +16,7 @@
 <meta name="twitter:description" content="Bulk translate and clean your Airtable data with AI. Free to try.">
 <link rel="canonical" href="https://www.tturn.xyz">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"TableTurn","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"AI-powered data cleaning and translation tool for Airtable. Bulk translate and clean your Airtable data with DeepSeek AI.","url":"https://www.tturn.xyz","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Organization","name":"TableTurn"}}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"TableTurn","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"AI-powered data cleaning and translation tool for Airtable. Bulk translate and clean your Airtable data with DeepSeek V4 Pro.","url":"https://www.tturn.xyz","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Organization","name":"TableTurn"}}
 </script>
 <script src="/i18n.js"></script>
 <style>
@@ -129,8 +129,8 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
   <!-- Hero Section -->
   <div class="hero-section" id="section-hero">
     <h1>AI-Powered <span>Data Cleaning</span><br>& Translation for Airtable</h1>
-    <p class="hero-desc">Connect your Airtable base in seconds. Bulk translate, clean, and standardize your data with DeepSeek AI. No scripts, no hassle.</p>
-    <button class="btn hero-demo-btn" onclick="startDemo()">🧪 Try Live Demo — 3 Free, No Login</button>
+    <p class="hero-desc">Connect your Airtable base in seconds. Bulk translate, clean, and standardize your data with DeepSeek V4 Pro. No scripts, no hassle.</p>
+    <button class="btn hero-demo-btn" id="hero-demo-btn-main" onclick="startDemo()">🧪 Try Live Demo — 3 Free, No Login</button>
     <p style="font-size:12px;color:var(--muted);margin-top:10px;">Sample data included · 3 free translations + 3 free cleanings · No registration</p>
   </div>
 
@@ -483,7 +483,7 @@ async function onAuthSuccess() {
   document.getElementById('section-auth').classList.add('hidden'); document.getElementById('section-auth').style.display='none';
   document.getElementById('app-sections').classList.remove('hidden');
     // Hide the hero demo button but keep the heading
-    var heroDemoBtn = document.querySelector('#section-hero .hero-demo-btn');
+    var heroDemoBtn = document.getElementById('hero-demo-btn-main');
     if (heroDemoBtn) heroDemoBtn.style.display = 'none';
   document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
   document.getElementById('btn-dashboard').classList.remove('hidden');
@@ -857,7 +857,7 @@ async function startDemo() {
     document.getElementById('section-auth').classList.add('hidden'); document.getElementById('section-auth').style.display='none';
     document.getElementById('app-sections').classList.remove('hidden');
     // Hide the hero demo button but keep the heading
-    var heroDemoBtn = document.querySelector('#section-hero .hero-demo-btn');
+    var heroDemoBtn = document.getElementById('hero-demo-btn-main');
     if (heroDemoBtn) heroDemoBtn.style.display = 'none';
     document.getElementById('demo-banner').classList.remove('hidden');
     document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
