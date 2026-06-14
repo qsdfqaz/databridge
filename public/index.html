@@ -636,10 +636,17 @@ if (urlParams.get('topup') === 'success') {
   window.history.replaceState({}, '', '/');
 }
 
+// Auto-restore demo mode from URL hash (survives refresh & history)
+if (window.location.hash === '#demo' && !token) {
+  setTimeout(function() { startDemo(); }, 300);
+}
+
 // Handle browser back button from demo mode
 window.addEventListener('popstate', function(e) {
   if (isDemo) {
     resetDemo();
+    // Clean URL hash
+    if (window.location.hash === '#demo') { history.replaceState({}, '', '/'); }
     // Show hero + auth
     document.getElementById('section-hero').classList.remove('hidden');
     document.getElementById('section-auth').classList.remove('hidden');
@@ -1046,6 +1053,8 @@ function resetDemo() {
   document.getElementById('conn-status').className = 'status-badge off';
   document.getElementById('header-base-info').textContent = '';
   document.getElementById('bal-badge').textContent = '💎 $0.00';
+  // Clean URL hash
+  if (window.location.hash === '#demo') { history.replaceState({}, '', '/'); }
   toast('Demo ended. Register to process your own data!');
 }
 
