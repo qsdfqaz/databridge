@@ -108,6 +108,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
 .hero-demo-btn:hover{transform:translateY(-2px)!important;box-shadow:0 8px 40px rgba(124,58,237,0.7)!important}
 @keyframes pulse{0%,100%{box-shadow:0 4px 32px rgba(124,58,237,0.5)}50%{box-shadow:0 4px 48px rgba(124,58,237,0.8)}}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -120,6 +121,8 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
     <span id="balance-display" style="font-size:12px;color:var(--accent);font-weight:600;margin-right:10px;display:none;">Balance: $0.00</span><span class="status-badge off" id="conn-status">Disconnected</span>
     <span class="bal-badge" id="bal-badge" onclick="showTopupModal()">💎 $0.00</span>
     <button class="btn btn-sm btn-outline hidden" id="btn-dashboard" onclick="toggleDashboard()">📊 Usage</button>
+    <button class="btn btn-sm btn-outline hidden" id="btn-reports" onclick="toggleReports()">📈 Reports</button>
+    <button class="btn btn-sm btn-outline hidden" id="btn-docs" onclick="toggleDocs()">📄 Docs</button>
     <button class="btn btn-sm btn-outline hidden" id="btn-templates" onclick="toggleTemplates()">🧩 Templates</button>
     <button class="btn btn-sm btn-outline hidden" id="btn-script" onclick="showAirtableScript()">📜 Script</button>
     <button class="btn btn-sm btn-outline hidden" id="btn-logout" onclick="logout()">Logout</button>
@@ -308,6 +311,42 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
       </div>
       <div id="template-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;"></div>
     </div>
+
+    <!-- Reports (TableDash) -->
+    <div class="card hidden" id="section-reports">
+      <h3>📈 Reports</h3>
+      <p class="desc">Create charts from your Airtable data — share with a link</p>
+      <div id="reports-list" style="margin-bottom:16px;"></div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1;"><label>Report Title</label><input type="text" id="report-title" placeholder="e.g. Monthly Sales Overview"></div>
+        <div class="form-group"><label>Chart Type</label><select id="report-chart-type"><option value="bar">Bar Chart</option><option value="line">Line Chart</option><option value="pie">Pie Chart</option><option value="table">Table View</option></select></div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">Uses currently selected fields from the table above. <span id="report-field-info"></span></p>
+      <div id="report-preview" style="background:var(--bg);border-radius:var(--radius-sm);padding:16px;margin-bottom:12px;min-height:100px;">
+        <p style="color:var(--muted);text-align:center;padding:20px;">Load data first, then click "Create Report"</p>
+      </div>
+      <button class="btn btn-primary" onclick="createReport()">📈 Create Report</button>
+      <button class="btn btn-outline" onclick="loadReportsList()" style="margin-left:6px;">📋 My Reports</button>
+    </div>
+
+    <!-- Documents (DocuTurn) -->
+    <div class="card hidden" id="section-docs">
+      <h3>📄 Generate Documents</h3>
+      <p class="desc">Turn Airtable data into invoices, reports, receipts — AI writes the content</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;" id="doc-template-list"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+        <div class="form-group"><label>Select Records</label><select id="doc-record-count"><option value="1">1 row</option><option value="3">3 rows</option><option value="5">5 rows</option></select></div>
+        <button class="btn btn-primary" id="btn-doc-generate" onclick="generateDocument()">🤖 Generate with AI</button>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:4px;">💰 Free: 3 docs/month (watermarked) · Pro: 50/month · $0.50/extra doc</p>
+      <div id="doc-preview" class="hidden" style="margin-top:12px;">
+        <div style="background:#fff;border-radius:var(--radius-sm);padding:20px;max-height:500px;overflow-y:auto;color:#1a1a2e;" id="doc-preview-content"></div>
+        <div class="form-row" style="margin-top:8px;">
+          <button class="btn btn-primary" onclick="exportPDF()">📥 Download PDF</button>
+          <button class="btn btn-outline" onclick="printDocument()">🖨️ Print</button>
+        </div>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -374,6 +413,16 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
   <a href="/privacy" target="_blank" style="color:var(--muted);">Privacy</a> ·
   Powered by DeepSeek
 </footer>
+
+<!-- Share Report Modal -->
+<div id="modal-share-report" class="modal-overlay hidden">
+<div class="modal"><h4>🔗 Share Report</h4><p class="desc">Generate a shareable link for this report</p>
+<div class="form-group" style="margin-bottom:12px"><label>Access Mode</label><select id="share-mode" onchange="document.getElementById('share-pw-group').style.display=this.value==='password'?'':'none'"><option value="public">Anyone with link can view</option><option value="password">Require password</option></select></div>
+<div class="form-group hidden" id="share-pw-group" style="margin-bottom:12px"><label>Password</label><input type="text" id="share-password" placeholder="Enter a password"></div>
+<div class="form-group" style="margin-bottom:12px"><label>Link Expiry</label><select id="share-expiry"><option value="">Never expires</option><option value="7">7 days</option><option value="30">30 days</option></select></div>
+<div id="share-result" class="hidden" style="margin-top:8px;"><p style="font-size:11px;color:var(--muted);">Share URL:</p><input type="text" id="share-url" readonly style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--accent);font-size:12px;" onclick="this.select()"><button class="btn btn-sm btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('share-url').value);toast('Copied!')" style="margin-top:6px;">📋 Copy Link</button></div>
+<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal('modal-share-report')">Close</button><button class="btn btn-primary" id="btn-share-gen" onclick="shareReport()">Generate Link</button></div>
+</div></div>
 
 <!-- Forgot Password Modal -->
 <div id="modal-forgot" class="modal-overlay hidden">
@@ -524,6 +573,8 @@ async function onAuthSuccess() {
     if (heroDemoBtn) heroDemoBtn.style.display = 'none';
   document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); var backBtn = document.getElementById('btn-back-from-demo'); if (backBtn) backBtn.style.display=''; var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
   document.getElementById('btn-dashboard').classList.remove('hidden');
+  document.getElementById('btn-reports').classList.remove('hidden');
+  document.getElementById('btn-docs').classList.remove('hidden');
   document.getElementById('btn-templates').classList.remove('hidden');
   document.getElementById('btn-script').classList.remove('hidden');
   document.getElementById('btn-logout').textContent = '退出';
@@ -1258,6 +1309,263 @@ estimateAndExecute = async function(action) {
   }
   return origEstimateAndExecute(action);
 };
+
+// ── Reports (TableDash) ──
+let currentReportId = null;
+let currentDocHtml = '';
+
+function toggleReports() {
+  var sec = document.getElementById('section-reports');
+  if (!sec.classList.contains('hidden')) { sec.classList.add('hidden'); return; }
+  sec.classList.remove('hidden');
+  hideOtherSections(['section-reports']);
+  if (state.records.length) {
+    document.getElementById('report-field-info').textContent = state.selectedFields.length + ' fields selected';
+  }
+  loadReportsList();
+}
+
+function toggleDocs() {
+  var sec = document.getElementById('section-docs');
+  if (!sec.classList.contains('hidden')) { sec.classList.add('hidden'); return; }
+  sec.classList.remove('hidden');
+  hideOtherSections(['section-docs']);
+  loadDocTemplates();
+}
+
+function hideOtherSections(keep) {
+  ['section-dashboard','section-templates','section-results','section-reports','section-docs'].forEach(function(id) {
+    if (!keep.includes(id)) document.getElementById(id).classList.add('hidden');
+  });
+}
+
+async function createReport() {
+  if (!state.records.length) return toast('Load data first','error');
+  if (!state.selectedFields.length) return toast('Select fields first','error');
+  var title = document.getElementById('report-title').value.trim();
+  if (!title) title = 'Report - ' + new Date().toLocaleDateString();
+  var chartType = document.getElementById('report-chart-type').value;
+
+  try {
+    var res = await api('/api/reports/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: title, baseId: state.baseId, tableId: document.getElementById('select-table').value,
+        fields: state.selectedFields, chartType: chartType,
+        config: { records: state.records.slice(0, 50) }
+      })
+    });
+    if (!res.ok) throw new Error((await res.json()).error);
+    var report = await res.json();
+    currentReportId = report.id;
+    renderReportPreview(report);
+    toast('Report created! Click "My Reports" to share', 'success');
+    loadReportsList();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function renderReportPreview(report) {
+  var container = document.getElementById('report-preview');
+  var fields = report.fields;
+  var chartType = report.chartType;
+  var records = (report.config && report.config.records) ? report.config.records : state.records;
+  if (!records.length) { container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px;">No data</p>'; return; }
+
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">';
+  fields.forEach(function(f, i) {
+    var fname = typeof f === 'string' ? f : f.name || f;
+    html += '<div style="background:var(--bg);border-radius:8px;padding:12px;"><strong style="font-size:12px;color:var(--muted);">' + fname + '</strong><div style="height:200px;"><canvas id="preview-chart-' + i + '"></canvas></div></div>';
+  });
+  html += '</div>';
+  if (chartType === 'table') {
+    html = '<div class="table-wrap"><table><thead><tr>' + fields.map(function(f) { return '<th>' + (typeof f === 'string' ? f : f.name || f) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    records.slice(0, 10).forEach(function(r) {
+      html += '<tr>' + fields.map(function(f) { var k = typeof f === 'string' ? f : f.name || f; return '<td>' + (r[k] !== undefined ? String(r[k]).slice(0, 60) : '-') + '</td>'; }).join('') + '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  container.innerHTML = html;
+
+  // Render charts after DOM update
+  if (chartType !== 'table') {
+    setTimeout(function() {
+      fields.forEach(function(f, i) {
+        var canvas = document.getElementById('preview-chart-' + i);
+        if (!canvas) return;
+        var fname = typeof f === 'string' ? f : f.name || f;
+        var labels = records.slice(0, 20).map(function(r) { return r.id ? r.id.slice(-6) : ''; });
+        var values = records.slice(0, 20).map(function(r) {
+          var v = r[fname];
+          return typeof v === 'number' ? v : (typeof v === 'string' ? v.length : 0);
+        });
+        new Chart(canvas, {
+          type: chartType,
+          data: { labels: labels, datasets: [{ label: fname, data: values, backgroundColor: 'rgba(124,58,237,0.5)', borderColor: '#7c3aed', borderWidth: 1 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8888aa' } } }, scales: { x: { ticks: { color: '#8888aa' } }, y: { ticks: { color: '#8888aa' } } } }
+        });
+      });
+    }, 100);
+  }
+}
+
+var _reportsCache = {};
+async function loadReportsList() {
+  try {
+    var res = await api('/api/reports/list');
+    if (!res.ok) return;
+    var data = await res.json();
+    _reportsCache = {};
+    data.reports.forEach(function(r) { _reportsCache[r.id] = r; });
+    var list = document.getElementById('reports-list');
+    if (!data.reports.length) {
+      list.innerHTML = '<p style="font-size:12px;color:var(--muted);">No reports yet. Load data and create one!</p>';
+      return;
+    }
+    list.innerHTML = data.reports.map(function(r) {
+      var shared = r.shareToken ? '<span style="color:var(--green);font-size:11px;">🔗 Shared (' + (r.shareMode || 'public') + ')</span>' : '<span style="color:var(--muted);font-size:11px;">🔒 Private</span>';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:6px;">' +
+        '<div><strong style="font-size:13px;">' + escapeHtml(r.title) + '</strong><br><span style="font-size:11px;color:var(--muted);">' + r.chartType + ' · ' + (r.fields||[]).length + ' fields · ' + new Date(r.createdAt).toLocaleDateString() + '</span></div>' +
+        '<div style="display:flex;gap:6px;">' +
+        '<button class="btn btn-sm btn-outline" onclick="viewCachedReport(\'' + r.id + '\')">👁 View</button>' +
+        (r.shareToken ?
+          '<button class="btn btn-sm btn-outline" onclick="unshareReport(\'' + r.id + '\')">Unshare</button>' :
+          '<button class="btn btn-sm btn-primary" onclick="currentReportId=\'' + r.id + '\';document.getElementById(\'modal-share-report\').classList.remove(\'hidden\')">🔗 Share</button>') +
+        '<button class="btn btn-sm btn-danger" onclick="deleteReport(\'' + r.id + '\')">🗑</button>' +
+        '</div></div>';
+    }).join('');
+  } catch(e) {}
+}
+
+function viewCachedReport(id) {
+  var r = _reportsCache[id];
+  if (!r) return;
+  currentReportId = id;
+  renderReportPreview(r);
+  document.getElementById('section-reports').scrollIntoView({behavior:'smooth'});
+}
+
+async function shareReport() {
+  if (!currentReportId) return;
+  var mode = document.getElementById('share-mode').value;
+  var password = document.getElementById('share-password').value;
+  var expiry = document.getElementById('share-expiry').value;
+  try {
+    var res = await api('/api/reports/' + currentReportId + '/share', {
+      method: 'POST',
+      body: JSON.stringify({ mode: mode, password: password || null, expiry: expiry || null })
+    });
+    if (!res.ok) throw new Error((await res.json()).error);
+    var data = await res.json();
+    document.getElementById('share-url').value = data.shareUrl;
+    document.getElementById('share-result').classList.remove('hidden');
+    document.getElementById('btn-share-gen').textContent = 'Copy Link';
+    document.getElementById('btn-share-gen').onclick = function() {
+      navigator.clipboard.writeText(data.shareUrl);
+      toast('Link copied!', 'success');
+    };
+    toast('Share link generated!', 'success');
+    loadReportsList();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function unshareReport(id) {
+  try {
+    await api('/api/reports/' + id + '/unshare', { method: 'POST' });
+    toast('Link revoked', 'success');
+    loadReportsList();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteReport(id) {
+  if (!confirm('Delete this report?')) return;
+  try {
+    await api('/api/reports/' + id, { method: 'DELETE' });
+    toast('Report deleted');
+    loadReportsList();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Documents (DocuTurn) ──
+async function loadDocTemplates() {
+  try {
+    var res = await fetch('/api/documents/templates');
+    var data = await res.json();
+    document.getElementById('doc-template-list').innerHTML = data.templates.map(function(t) {
+      return '<div onclick="selectDocTemplate(\'' + t.id + '\',this)" class="topup-opt" data-tpl="' + t.id + '" style="flex:1;min-width:140px;padding:12px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer;">' +
+        '<div style="font-size:24px;">' + t.icon + '</div><strong style="font-size:13px;">' + t.name + '</strong><br><span style="font-size:10px;color:var(--muted);">' + t.desc + '</span></div>';
+    }).join('');
+  } catch(e) {}
+}
+
+var selectedDocTemplate = null;
+function selectDocTemplate(id, el) {
+  selectedDocTemplate = id;
+  document.querySelectorAll('#doc-template-list > div').forEach(function(d) {
+    d.style.borderColor = 'var(--border)'; d.style.background = '';
+  });
+  el.style.borderColor = 'var(--accent)'; el.style.background = 'var(--accent-light)';
+}
+
+async function generateDocument() {
+  if (!selectedDocTemplate) return toast('Select a template first', 'error');
+  if (!state.records.length) return toast('Load data first', 'error');
+  var count = parseInt(document.getElementById('doc-record-count').value);
+  var records = state.records.slice(0, count).map(function(r) {
+    var o = {}; state.selectedFields.forEach(function(f) { if (r[f] !== undefined) o[f] = r[f]; });
+    return o;
+  });
+
+  document.getElementById('btn-doc-generate').disabled = true;
+  document.getElementById('btn-doc-generate').textContent = 'Generating...';
+  try {
+    var res = await api('/api/documents/generate', {
+      method: 'POST',
+      body: JSON.stringify({ templateId: selectedDocTemplate, records: records, fields: state.selectedFields })
+    });
+    if (!res.ok) throw new Error((await res.json()).error);
+    var data = await res.json();
+    currentDocHtml = data.html;
+    document.getElementById('doc-preview-content').innerHTML = data.html;
+    document.getElementById('doc-preview').classList.remove('hidden');
+    document.getElementById('doc-preview').scrollIntoView({ behavior: 'smooth' });
+    toast('Document generated!', 'success');
+  } catch(e) { toast(e.message, 'error'); }
+  document.getElementById('btn-doc-generate').disabled = false;
+  document.getElementById('btn-doc-generate').textContent = '🤖 Generate with AI';
+}
+
+async function exportPDF() {
+  if (!currentDocHtml) return toast('Generate a document first', 'error');
+  try {
+    var res = await api('/api/documents/export-pdf', {
+      method: 'POST',
+      body: JSON.stringify({ html: currentDocHtml })
+    });
+    if (res.headers.get('Content-Type') === 'application/pdf') {
+      var blob = await res.blob();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'TableTurn-document.pdf';
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+      toast('PDF downloaded!', 'success');
+    } else {
+      var data = await res.json();
+      if (data.fallback) {
+        toast('Opening print preview...', 'success');
+        printDocument();
+      }
+    }
+  } catch(e) { toast('PDF failed: ' + e.message + '. Try Print instead.', 'error'); }
+}
+
+function printDocument() {
+  if (!currentDocHtml) return toast('Generate a document first', 'error');
+  var w = window.open('', '_blank', 'width=800,height=600');
+  w.document.write(currentDocHtml);
+  w.document.close();
+  setTimeout(function() { w.print(); }, 500);
+}
 
 // ── i18n: apply language to all static text on page load ──
 function applyI18nHTML() {

@@ -1266,6 +1266,272 @@ if (!hasDS && !hasOAI && !hasDL) {
   console.log('╚══════════════════════════════════════════╝\n');
 }
 
+// ═══════════════ Reports (TableDash) ═══════════════
+const REPORTS_FILE = path.join(DATA_DIR, 'reports.json');
+if (!fs.existsSync(REPORTS_FILE)) fs.writeFileSync(REPORTS_FILE, '{}');
+
+const crypto = require('crypto');
+
+// Create report
+app.post('/api/reports/create', authRequired, (req, res) => {
+  try {
+    const { title, baseId, tableId, fields, chartType, config } = req.body;
+    if (!title || !fields?.length) return res.status(400).json({ error: 'Title and fields required' });
+
+    const reports = readJSON(REPORTS_FILE);
+    const id = 'rpt_' + Date.now().toString(36);
+    reports[id] = {
+      id, userId: req.userId, title, baseId, tableId, fields, chartType: chartType || 'bar',
+      config: config || {}, shareToken: null, sharePassword: null, shareExpiry: null,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+    };
+    writeJSON(REPORTS_FILE, reports);
+    res.status(201).json(reports[id]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// List user's reports
+app.get('/api/reports/list', authRequired, (req, res) => {
+  const reports = readJSON(REPORTS_FILE);
+  const mine = Object.values(reports).filter(r => r.userId === req.userId)
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  res.json({ reports: mine });
+});
+
+// Share a report (generate token)
+app.post('/api/reports/:id/share', authRequired, (req, res) => {
+  const reports = readJSON(REPORTS_FILE);
+  const report = reports[req.params.id];
+  if (!report || report.userId !== req.userId) return res.status(404).json({ error: 'Report not found' });
+
+  const { mode, password, expiry } = req.body; // mode: 'public' | 'password'
+  report.shareToken = crypto.randomBytes(16).toString('hex'); // 32-char random, unguessable
+  report.shareMode = mode || 'public';
+  if (mode === 'password' && password) {
+    report.sharePassword = bcrypt.hashSync(password, 10);
+  } else {
+    report.sharePassword = null;
+  }
+  report.shareExpiry = expiry || null; // '7d', '30d', null = permanent
+  report.updatedAt = new Date().toISOString();
+  writeJSON(REPORTS_FILE, reports);
+
+  const shareUrl = `${req.protocol}://${req.get('host')}/r/${report.shareToken}`;
+  res.json({ shareUrl, token: report.shareToken, mode: report.shareMode });
+});
+
+// Unshare a report
+app.post('/api/reports/:id/unshare', authRequired, (req, res) => {
+  const reports = readJSON(REPORTS_FILE);
+  const report = reports[req.params.id];
+  if (!report || report.userId !== req.userId) return res.status(404).json({ error: 'Report not found' });
+  report.shareToken = null; report.sharePassword = null; report.shareMode = null; report.shareExpiry = null;
+  report.updatedAt = new Date().toISOString();
+  writeJSON(REPORTS_FILE, reports);
+  res.json({ ok: true });
+});
+
+// Delete report
+app.delete('/api/reports/:id', authRequired, (req, res) => {
+  const reports = readJSON(REPORTS_FILE);
+  const report = reports[req.params.id];
+  if (!report || report.userId !== req.userId) return res.status(404).json({ error: 'Report not found' });
+  delete reports[req.params.id];
+  writeJSON(REPORTS_FILE, reports);
+  res.json({ ok: true });
+});
+
+// View shared report (public, no auth)
+app.get('/r/:token', (req, res) => {
+  const reports = readJSON(REPORTS_FILE);
+  const report = Object.values(reports).find(r => r.shareToken === req.params.token);
+  if (!report) return res.status(404).send('<h2>Report not found or has been removed</h2>');
+
+  // Check expiry
+  if (report.shareExpiry) {
+    const created = new Date(report.updatedAt);
+    const days = parseInt(report.shareExpiry);
+    if (Date.now() - created.getTime() > days * 86400000) {
+      return res.status(410).send('<h2>This report link has expired</h2>');
+    }
+  }
+
+  // Password check
+  if (report.sharePassword) {
+    const pw = req.query.pw || '';
+    if (!bcrypt.compareSync(pw, report.sharePassword)) {
+      return res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="robots" content="noindex,nofollow"><title>Password Required</title>
+<style>body{font-family:-apple-system,sans-serif;background:#0a0a0f;color:#e8e8f0;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+input{padding:10px 14px;border:1px solid #2a2a4a;border-radius:8px;background:#131320;color:#fff;font-size:14px}
+button{padding:10px 20px;background:#7c3aed;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600}</style></head>
+<body><div style="text-align:center"><h3>🔒 Password Required</h3><p style="color:#8888aa">Enter password to view this report</p>
+<form method="GET"><input type="password" name="pw" placeholder="Password" autofocus><button type="submit">View Report</button></form></div></body></html>`);
+    }
+  }
+
+  // Render report page
+  res.send(renderReportPage(report));
+});
+
+function renderReportPage(report) {
+  const title = report.title || 'Report';
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>${title} — TableTurn Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\\/script>
+<style>
+:root{--bg:#0a0a0f;--surface:#1a1a2e;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#7c3aed}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);padding:24px;min-height:100vh}
+.header{text-align:center;padding:32px 0 24px}
+.header h1{font-size:28px;color:#fff}.header p{color:var(--muted);margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:20px;max-width:1200px;margin:0 auto}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
+.chart-card h3{font-size:14px;color:var(--muted);margin-bottom:12px}
+.chart-wrap{position:relative;height:300px}
+.footer{text-align:center;padding:24px;color:var(--muted);font-size:12px;margin-top:24px;border-top:1px solid var(--border)}
+a{color:var(--accent)}
+</style></head><body>
+<div class="header"><h1>${escapeHtml(title)}</h1><p>${report.fields.length} fields · Generated by TableTurn</p></div>
+<div class="grid">${(report.fields||[]).map((f,i) => `
+<div class="chart-card"><h3>${escapeHtml(typeof f==='string'?f:f.name||f)}</h3>
+<div class="chart-wrap"><canvas id="chart${i}"></canvas></div></div>`).join('')}</div>
+<div class="footer">Powered by <a href="https://www.tturn.xyz">TableTurn</a> — AI-Powered Data Tools for Airtable</div>
+<script>
+(function(){
+var fields = ${JSON.stringify(report.fields)};
+var chartType = '${report.chartType || 'bar'}';
+${report.config?.records ? `var records = ${JSON.stringify(report.config.records)};` : 'var records = [];'}
+fields.forEach(function(f,i){
+  var canvas = document.getElementById('chart'+i);
+  if(!canvas||!records.length) return;
+  var fname = typeof f === 'string' ? f : f.name || f;
+  var labels = records.map(function(r){ return r.id ? r.id.slice(-6) : ''; });
+  var values = records.map(function(r){ var v=r[fname]; return typeof v==='number'?v:(typeof v==='string'?v.length:0); });
+  new Chart(canvas,{
+    type: chartType,
+    data:{ labels:labels, datasets:[{ label:fname, data:values, backgroundColor:'rgba(124,58,237,0.6)', borderColor:'#7c3aed', borderWidth:1 }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:'#8888aa' } } }, scales:{ x:{ ticks:{ color:'#8888aa' } }, y:{ ticks:{ color:'#8888aa' } } } }
+  });
+});
+})();<\\/script>
+</body></html>`;
+}
+
+function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ═══════════════ Documents (DocuTurn) ═══════════════
+const DOC_TEMPLATES = [
+  { id:'invoice', name:'Invoice / 报价单', category:'business', icon:'💰',
+    desc:'Generate professional invoices from your Airtable data',
+    fields:['Company Name','Amount','Date','Description'],
+    prompt: 'Generate a professional invoice. Fill in company name, amount, date, and write a 1-2 sentence description of the service.'
+  },
+  { id:'report', name:'Project Report / 项目报告', category:'business', icon:'📋',
+    desc:'Auto-generate project status reports with AI summaries',
+    fields:['Project Name','Status','Progress','Notes'],
+    prompt: 'Generate a project status report. Summarize progress and notes into a professional paragraph.'
+  },
+  { id:'receipt', name:'Receipt / 收据', category:'finance', icon:'🧾',
+    desc:'Create payment receipts from transaction records',
+    fields:['Customer','Amount','Date','Payment Method'],
+    prompt: 'Generate a payment receipt with customer name, amount, date, and payment method.'
+  },
+  { id:'summary', name:'Data Summary / 数据汇总', category:'reports', icon:'📊',
+    desc:'AI-generated summary report of any table data',
+    fields:[],
+    prompt: 'Analyze the provided data and generate a 2-3 paragraph executive summary with key insights.'
+  }
+];
+
+app.get('/api/documents/templates', (req, res) => {
+  res.json({ templates: DOC_TEMPLATES });
+});
+
+app.post('/api/documents/generate', authRequired, async (req, res) => {
+  try {
+    const { templateId, records, fields } = req.body;
+    const template = DOC_TEMPLATES.find(t => t.id === templateId);
+    if (!template) return res.status(400).json({ error: 'Template not found' });
+
+    // Use AI to generate document content
+    let html = '';
+    if (template.id === 'summary') {
+      // AI summary mode
+      const aiResp = await llmChat([
+        { role:'system', content: 'You are a business analyst. Write a clear, professional executive summary in HTML format (use h2, p, ul, li tags). No markdown, just HTML.' },
+        { role:'user', content: `${template.prompt}\n\nData:\n${JSON.stringify(records.slice(0,10))}` }
+      ], 2000);
+      html = aiResp.choices[0].message.content.trim();
+      // Strip any markdown code fences
+      html = html.replace(/```html?/g, '').replace(/```/g, '');
+    } else {
+      // Template fill mode
+      const aiResp = await llmChat([
+        { role:'system', content: 'You are a document generator. Return valid HTML for a professional document. Use h1, h2, p, table, ul tags. Include inline CSS for styling. No markdown fences.' },
+        { role:'user', content: `${template.prompt}\n\nRecords to fill:\n${JSON.stringify(records.slice(0,5))}\n\nTemplate fields: ${template.fields.join(', ')}\n\nGenerate a complete, styled HTML document ready for PDF export.` }
+      ], 3000);
+      html = aiResp.choices[0].message.content.trim();
+      html = html.replace(/```html?/g, '').replace(/```/g, '');
+    }
+
+    // Wrap in full HTML page for PDF
+    const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:700px;margin:40px auto;padding:0 20px;line-height:1.7;color:#1a1a2e}
+h1{font-size:24px;border-bottom:2px solid #7c3aed;padding-bottom:8px}
+h2{font-size:18px;color:#7c3aed;margin-top:20px}
+table{width:100%;border-collapse:collapse;margin:16px 0}
+th,td{padding:8px 12px;border:1px solid #ddd;text-align:left}
+th{background:#f5f3ff}ul li{margin:4px 0}
+.footer{margin-top:32px;padding-top:16px;border-top:1px solid #ddd;font-size:11px;color:#888}
+</style></head><body>
+<div style="text-align:right;color:#7c3aed;font-weight:700;font-size:20px;margin-bottom:24px;">${template.name}</div>
+${html}
+<div class="footer">Generated by TableTurn · ${new Date().toLocaleDateString()}</div>
+</body></html>`;
+
+    res.json({ html: fullHtml, templateId, title: template.name });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Export document as PDF (server-side)
+app.post('/api/documents/export-pdf', authRequired, async (req, res) => {
+  try {
+    const { html } = req.body;
+    if (!html) return res.status(400).json({ error: 'HTML content required' });
+
+    // Attempt Puppeteer PDF generation
+    let pdfBuffer = null;
+    try {
+      const puppeteer = require('puppeteer');
+      const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox','--disable-setuid-sandbox'] });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
+      pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top:'20mm', bottom:'20mm', left:'15mm', right:'15mm' } });
+      await browser.close();
+    } catch (puppErr) {
+      console.log('[PDF] Puppeteer not available, returning HTML fallback:', puppErr.message);
+    }
+
+    if (pdfBuffer) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="TableTurn-document.pdf"');
+      return res.send(pdfBuffer);
+    }
+    // Fallback: return HTML for client-side print
+    res.json({ html, fallback: true, message: 'PDF engine unavailable. Use browser print (Ctrl+P) to save as PDF.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// robots.txt — block crawlers from report pages
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain');
+  res.send(`User-agent: *
+Allow: /
+Disallow: /r/
+Disallow: /api/
+Sitemap: https://www.tturn.xyz/sitemap.xml`);
+});
+
 module.exports = app;
 
 // Only listen when running directly (not on Vercel)
