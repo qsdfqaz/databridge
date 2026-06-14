@@ -513,7 +513,7 @@ function logout() {
   token = ''; user = null; localStorage.removeItem('databridge_token');
   document.getElementById('section-auth').classList.remove('hidden');
   document.getElementById('app-sections').classList.add('hidden');
-  document.getElementById('btn-logout').classList.add('hidden'); document.getElementById('btn-back-from-demo').style.display='none';document.getElementById('btn-change-pwd').classList.add('hidden');
+  document.getElementById('btn-logout').classList.add('hidden'); var backBtn2 = document.getElementById('btn-back-from-demo'); if (backBtn2) backBtn2.style.display='none';document.getElementById('btn-change-pwd').classList.add('hidden');
   document.getElementById('user-email').textContent = '';
   updateBalance(0);
 }
@@ -524,7 +524,7 @@ async function onAuthSuccess() {
     // Hide the hero demo button but keep the heading
     var heroDemoBtn = document.getElementById('hero-demo-btn-main');
     if (heroDemoBtn) heroDemoBtn.style.display = 'none';
-  document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); document.getElementById('btn-back-from-demo').style.display=''; var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
+  document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); var backBtn = document.getElementById('btn-back-from-demo'); if (backBtn) backBtn.style.display=''; var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
   document.getElementById('btn-dashboard').classList.remove('hidden');
   document.getElementById('btn-templates').classList.remove('hidden');
   document.getElementById('btn-script').classList.remove('hidden');
@@ -899,7 +899,7 @@ async function startDemo() {
     var heroDemoBtn = document.getElementById('hero-demo-btn-main');
     if (heroDemoBtn) heroDemoBtn.style.display = 'none';
     document.getElementById('demo-banner').classList.remove('hidden');
-    document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); document.getElementById('btn-back-from-demo').style.display=''; var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
+    document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); var backBtn = document.getElementById('btn-back-from-demo'); if (backBtn) backBtn.style.display=''; var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
     document.getElementById('btn-logout').textContent = 'End Demo';
     document.getElementById('btn-logout').onclick = resetDemo;
     document.getElementById('user-email').textContent = '🧪 Demo User';
@@ -971,7 +971,7 @@ function resetDemo() {
   document.getElementById('section-ops').classList.add('hidden');
   document.getElementById('section-results').classList.add('hidden');
   document.getElementById('section-auth').classList.remove('hidden');
-  document.getElementById('btn-logout').classList.add('hidden'); document.getElementById('btn-back-from-demo').style.display='none';document.getElementById('btn-change-pwd').classList.add('hidden');
+  document.getElementById('btn-logout').classList.add('hidden'); var backBtn2 = document.getElementById('btn-back-from-demo'); if (backBtn2) backBtn2.style.display='none';document.getElementById('btn-change-pwd').classList.add('hidden');
   document.getElementById('user-email').textContent = '';
   document.getElementById('conn-status').textContent = '⚡ Disconnected';
   document.getElementById('conn-status').className = 'status-badge off';
