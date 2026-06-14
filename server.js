@@ -1400,6 +1400,133 @@ if (!hasDS && !hasOAI && !hasDL) {
   console.log('╚══════════════════════════════════════════╝\n');
 }
 
+// ═══════════════ Notion Integration ═══════════════
+const NOTION_API = 'https://api.notion.com/v1';
+const NOTION_VERSION = '2022-06-28';
+
+function notionHeaders(token) {
+  return { Authorization: `Bearer ${token}`, 'Notion-Version': NOTION_VERSION, 'Content-Type': 'application/json' };
+}
+
+// List Notion databases (search)
+app.post('/api/notion/databases', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token || !token.startsWith('ntn_') && !token.startsWith('secret_')) {
+      return res.status(400).json({ error: 'Invalid Notion token. Must start with ntn_ or secret_' });
+    }
+    const r = await fetch(`${NOTION_API}/search`, {
+      method: 'POST', headers: notionHeaders(token),
+      body: JSON.stringify({ filter: { property: 'object', value: 'database' }, page_size: 50 })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.message || `Notion error ${r.status}`);
+    const databases = (data.results || []).map(db => ({
+      id: db.id,
+      title: db.title?.[0]?.plain_text || db.id.slice(0, 8),
+      url: db.url
+    }));
+    res.json({ databases });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// Query a Notion database
+app.post('/api/notion/query', async (req, res) => {
+  try {
+    const { token, databaseId, maxRecords } = req.body;
+    if (!token || !databaseId) return res.status(400).json({ error: 'Token and databaseId required' });
+    const r = await fetch(`${NOTION_API}/databases/${databaseId}/query`, {
+      method: 'POST', headers: notionHeaders(token),
+      body: JSON.stringify({ page_size: Math.min(maxRecords || 50, 100) })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.message || `Notion error ${r.status}`);
+
+    // Extract field names from first page's properties
+    const pages = data.results || [];
+    let fieldNames = [];
+    if (pages.length > 0) {
+      fieldNames = Object.keys(pages[0].properties || {});
+    }
+
+    // Convert Notion pages to flat records
+    const records = pages.map(p => {
+      const row = { id: p.id, url: p.url };
+      const props = p.properties || {};
+      for (const [key, prop] of Object.entries(props)) {
+        row[key] = extractNotionValue(prop);
+      }
+      return row;
+    });
+
+    // Determine field types
+    const fields = fieldNames.map(name => {
+      const sample = pages[0]?.properties?.[name];
+      return { id: 'fld_' + name, name, type: notionPropToType(sample) };
+    });
+
+    res.json({ records, fields, hasMore: data.has_more, nextCursor: data.next_cursor });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+function extractNotionValue(prop) {
+  if (!prop) return '';
+  switch (prop.type) {
+    case 'title': return prop.title?.map(t => t.plain_text).join('') || '';
+    case 'rich_text': return prop.rich_text?.map(t => t.plain_text).join('') || '';
+    case 'number': return prop.number ?? '';
+    case 'select': return prop.select?.name || '';
+    case 'multi_select': return prop.multi_select?.map(s => s.name).join(', ') || '';
+    case 'date': return prop.date?.start || '';
+    case 'url': return prop.url || '';
+    case 'email': return prop.email || '';
+    case 'phone_number': return prop.phone_number || '';
+    case 'checkbox': return prop.checkbox ? 'Yes' : 'No';
+    case 'formula': return prop.formula?.string || prop.formula?.number || '';
+    case 'status': return prop.status?.name || '';
+    default: return '';
+  }
+}
+
+function notionPropToType(prop) {
+  if (!prop) return 'rich_text';
+  const map = { title:'singleLineText', rich_text:'multilineText', number:'number', select:'singleSelect', multi_select:'multipleSelects', date:'date', url:'url', email:'email', phone_number:'phoneNumber', checkbox:'checkbox', status:'singleSelect' };
+  return map[prop.type] || 'rich_text';
+}
+
+// Write back to Notion (create new pages with translated/cleaned data)
+app.post('/api/notion/write', async (req, res) => {
+  try {
+    const { token, databaseId, updates } = req.body;
+    if (!token || !databaseId || !updates?.length) return res.status(400).json({ error: 'Token, databaseId, and updates required' });
+
+    const results = [];
+    for (const update of updates) {
+      try {
+        // Build properties for new page
+        const properties = {};
+        for (const [key, value] of Object.entries(update.fields || {})) {
+          // Create rich_text property — most compatible
+          properties[key] = { rich_text: [{ text: { content: String(value) } }] };
+        }
+        const r = await fetch(`${NOTION_API}/pages`, {
+          method: 'POST', headers: notionHeaders(token),
+          body: JSON.stringify({ parent: { database_id: databaseId }, properties })
+        });
+        const data = await r.json();
+        if (r.ok) {
+          results.push({ ok: true, id: data.id, url: data.url });
+        } else {
+          results.push({ ok: false, error: data.message });
+        }
+      } catch (err) {
+        results.push({ ok: false, error: err.message });
+      }
+    }
+    res.json({ results, total: updates.length, succeeded: results.filter(r => r.ok).length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ═══════════════ Reports (TableDash) ═══════════════
 const REPORTS_FILE = path.join(DATA_DIR, 'reports.json');
 if (!fs.existsSync(REPORTS_FILE)) fs.writeFileSync(REPORTS_FILE, '{}');

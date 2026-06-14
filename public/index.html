@@ -211,7 +211,8 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
       <h3>Connect Data Source</h3>
       <div style="display:flex;gap:0;margin-bottom:20px;">
         <button class="btn btn-sm" id="tab-source-airtable" onclick="switchDataSource('airtable')" style="border-radius:8px 0 0 8px;background:var(--accent-light);border-color:var(--accent);color:var(--accent);">📡 Airtable</button>
-        <button class="btn btn-sm btn-outline" id="tab-source-file" onclick="switchDataSource('file')" style="border-radius:0 8px 8px 0;">📂 Upload CSV/Excel</button>
+        <button class="btn btn-sm btn-outline" id="tab-source-file" onclick="switchDataSource('file')" style="border-radius:0;">📂 Upload CSV/Excel</button>
+        <button class="btn btn-sm btn-outline" id="tab-source-notion" onclick="switchDataSource('notion')" style="border-radius:0 8px 8px 0;">📝 Notion</button>
       </div>
       <div id="source-airtable">
       <p class="desc">Enter your Airtable PAT and Base ID to get started</p>
@@ -233,6 +234,17 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
         </div>
         <div id="file-preview" class="hidden" style="margin-top:12px;"></div>
         <p style="font-size:11px;color:var(--muted);margin-top:4px;">🔒 File processed locally in your browser — never uploaded to our server</p>
+      </div>
+      <div id="source-notion" class="hidden">
+        <p class="desc">Connect your Notion database with an Internal Integration Token</p>
+        <div class="form-row">
+          <div class="form-group" style="flex:1;min-width:280px;"><label>Notion Token</label><input type="password" id="input-notion-token" placeholder="ntn_... or secret_..."></div>
+          <div class="form-group" style="justify-content:end"><button class="btn btn-primary" id="btn-notion-connect" onclick="connectNotion()">Connect</button></div>
+        </div>
+        <div class="form-group hidden" id="notion-db-group" style="margin-top:8px;"><label>Database</label><select id="select-notion-db" onchange="loadNotionRecords()"><option>-- Select database --</option></select></div>
+        <p style="font-size:11px;color:var(--muted);">Create a Notion integration at <a href="https://www.notion.so/my-integrations" target="_blank" style="color:var(--accent);">notion.so/my-integrations ↗</a></p>
+        <div style="margin-top:8px;"><button class="btn btn-sm btn-outline" onclick="document.getElementById('notion-tutorial').classList.toggle('hidden')" style="font-size:11px;">📖 How to get your Notion token</button><div id="notion-tutorial" class="hidden" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:6px;font-size:12px;color:var(--text);line-height:1.8;"><strong>1.</strong> Go to <a href="https://www.notion.so/my-integrations" target="_blank" style="color:var(--accent);">notion.so/my-integrations ↗</a><br><strong>2.</strong> Click "New integration", name it "TableTurn"<br><strong>3.</strong> Select your workspace, click Submit<br><strong>4.</strong> Copy the "Internal Integration Secret" (starts with <code>ntn_</code>)<br><strong>5.</strong> In Notion, open your database → ... menu → Connections → Add TableTurn<br><strong>6.</strong> Paste the token above and click Connect</div></div>
+        <p style="font-size:11px;color:var(--accent);margin-top:4px;">🔒 Your token stays in your browser, never stored on our server.</p>
       </div>
     </div>
 
@@ -710,12 +722,75 @@ function switchDataSource(source) {
   currentDataSource = source;
   document.getElementById('source-airtable').classList.toggle('hidden', source !== 'airtable');
   document.getElementById('source-file').classList.toggle('hidden', source !== 'file');
-  document.getElementById('tab-source-airtable').style.background = source === 'airtable' ? 'var(--accent-light)' : '';
-  document.getElementById('tab-source-airtable').style.borderColor = source === 'airtable' ? 'var(--accent)' : 'var(--border)';
-  document.getElementById('tab-source-airtable').style.color = source === 'airtable' ? 'var(--accent)' : 'var(--muted)';
-  document.getElementById('tab-source-file').style.background = source === 'file' ? 'var(--accent-light)' : '';
-  document.getElementById('tab-source-file').style.borderColor = source === 'file' ? 'var(--accent)' : 'var(--border)';
-  document.getElementById('tab-source-file').style.color = source === 'file' ? 'var(--accent)' : 'var(--muted)';
+  document.getElementById('source-notion').classList.toggle('hidden', source !== 'notion');
+  ['airtable','file','notion'].forEach(function(s) {
+    var tab = document.getElementById('tab-source-' + s);
+    if (!tab) return;
+    var active = source === s;
+    tab.style.background = active ? 'var(--accent-light)' : '';
+    tab.style.borderColor = active ? 'var(--accent)' : 'var(--border)';
+    tab.style.color = active ? 'var(--accent)' : 'var(--muted)';
+  });
+}
+
+// ── Notion Connect ──
+async function connectNotion() {
+  var token = document.getElementById('input-notion-token').value.trim();
+  if (!token) return toast('Please enter your Notion token','error');
+  state.pat = token; state.baseId = 'notion';
+  var btn = document.getElementById('btn-notion-connect');
+  btn.disabled = true; btn.textContent = 'Connecting...';
+  try {
+    var res = await fetch('/api/notion/databases', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token}) });
+    if (!res.ok) { var e = await res.json(); throw new Error(e.error); }
+    var data = await res.json();
+    if (!data.databases.length) return toast('No databases found. Make sure you granted the integration access to your database in Notion.','error');
+    var sel = document.getElementById('select-notion-db');
+    sel.innerHTML = data.databases.map(function(db) { return '<option value="' + db.id + '">' + db.title + '</option>'; }).join('');
+    document.getElementById('notion-db-group').classList.remove('hidden');
+    document.getElementById('conn-status').textContent = '📝 Notion Connected';
+    document.getElementById('conn-status').className = 'status-badge ok';
+    document.getElementById('header-base-info').textContent = '📁 Notion · ' + data.databases.length + ' databases';
+    toast('✅ Connected! Select a database above.','success');
+    state.notionToken = token;
+  } catch(err) { toast(err.message,'error'); }
+  btn.disabled = false; btn.textContent = 'Connect';
+}
+
+async function loadNotionRecords() {
+  var dbId = document.getElementById('select-notion-db').value;
+  if (!dbId || dbId === '-- Select database --') return;
+  var token = state.notionToken || document.getElementById('input-notion-token').value.trim();
+  document.getElementById('table-container').innerHTML = '<p style="padding:20px;color:var(--muted);">Loading from Notion...</p>';
+  document.getElementById('section-table').classList.remove('hidden');
+  document.getElementById('table-placeholder').classList.add('hidden');
+  try {
+    var res = await fetch('/api/notion/query', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token, databaseId:dbId, maxRecords:50}) });
+    if (!res.ok) { var e = await res.json(); throw new Error(e.error); }
+    var data = await res.json();
+    state.records = data.records;
+    state.fields = data.fields;
+    state.baseId = dbId;
+    state.selectedFields = data.fields.filter(function(f) { return ['singleLineText','multilineText','rich_text','title','number'].includes(f.type); }).map(function(f) { return f.name; }).slice(0, 5);
+
+    // Render field chips
+    var tf = data.fields;
+    document.getElementById('field-chips').innerHTML = tf.map(function(f) {
+      return '<span class="chip ' + (state.selectedFields.includes(f.name) ? 'selected' : '') + '" onclick="toggleField(\'' + f.name.replace(/'/g,"\\'") + '\',this)" title="' + f.type + '">' + f.name + '</span>';
+    }).join('');
+    document.getElementById('section-ops').classList.remove('hidden');
+
+    // Render table
+    var keys = tf.map(function(f) { return f.name; }).slice(0, 8);
+    var html = '<table><thead><tr><th>#</th>' + keys.map(function(k) { return '<th>' + k + '</th>'; }).join('') + '</tr></thead><tbody>';
+    data.records.slice(0, 25).forEach(function(r, i) {
+      html += '<tr><td>' + (i+1) + '</td>' + keys.map(function(k) { var v = r[k]; return '<td>' + (v !== undefined && v !== null ? String(v).slice(0, 80) : '<span style="color:var(--muted)">-</span>') + '</td>'; }).join('') + '</tr>';
+    });
+    html += '</tbody></table>';
+    document.getElementById('table-container').innerHTML = html;
+    document.getElementById('record-info').textContent = data.records.length + ' rows · ' + data.fields.length + ' columns';
+    toast('✅ ' + data.records.length + ' rows loaded', 'success');
+  } catch(err) { toast(err.message,'error'); }
 }
 
 // File upload drag & drop
