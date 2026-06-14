@@ -191,10 +191,15 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
   </div>
 
   <!-- Demo Banner (shown during demo) -->
-  <div id="demo-banner" class="card hidden" style="text-align:center;background:linear-gradient(135deg,#f5f3ff,#eef2ff);border-color:#7c3aed;">
-    <span style="font-size:20px;">🧪</span>
-    <strong style="color:#7c3aed;">Demo Mode</strong>
-    <span style="font-size:13px;color:var(--muted);margin-left:8px;">Sample data · Free trial · <span id="demo-counter">Translate 0/3 · Clean 0/3</span></span>
+  <div id="demo-banner" class="card hidden" style="text-align:center;background:linear-gradient(135deg,#fef3c7,#fde68a);border:2px dashed #f59e0b;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:20px;">🧪</span>
+      <div style="text-align:left;">
+        <strong style="color:#92400e;font-size:14px;">You're in demo mode — sample data only</strong>
+        <div style="font-size:12px;color:#a16207;"><span id="demo-counter">Translate 0/3 · Clean 0/3</span> · Free, no charge</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btn-connect-cta-demo" onclick="showConnectModal()" style="background:#7c3aed;font-size:13px;white-space:nowrap;">🚀 Connect your own Airtable</button>
   </div>
 
   <!-- App sections (hidden until auth/demo) -->
@@ -208,7 +213,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
         <div class="form-group" style="flex:1;min-width:180px"><label>Base ID</label><input type="text" id="input-base" placeholder="app..."></div>
         <div class="form-group" style="justify-content:end"><button class="btn btn-primary" id="btn-connect" onclick="connectAirtable()">Connect</button></div>
       </div>
-      <p style="font-size:11px;color:var(--muted)">Create a PAT at <a href="https://airtable.com/create/tokens" target="_blank" style="color:var(--accent)">airtable.com/create/tokens</a> with scopes: data.records:read + data.records:write + schema.bases:read</p>
+      <p style="font-size:11px;color:var(--muted)">Create a PAT at <a href="https://airtable.com/create/tokens" target="_blank" style="color:var(--accent)">airtable.com/create/tokens</a> with scopes: data.records:read + data.records:write + schema.bases:read</p><p style="font-size:11px;color:var(--accent);margin-top:4px;">🔒 Your PAT is stored only in your browser and never sent to our server.</p>
     </div>
 
     <!-- Table -->
@@ -228,7 +233,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
     <!-- Operations -->
     <div class="card hidden" id="section-ops">
       <h3>⚡ Actions</h3>
-      <p class="desc" style="font-size:12px;">💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · Powered by DeepSeek</p>
+      <p class="desc" id="pricing-desc" style="font-size:12px;">💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · Powered by DeepSeek</p><p id="demo-pricing-note" class="hidden" style="font-size:11px;color:#f59e0b;margin-top:2px;">🧪 Demo: Free, no charge — pricing applies only when using your own Airtable data</p>
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px">
         <h4 style="margin-bottom:6px">🌐 Translate</h4>
         <div class="form-row">
@@ -246,7 +251,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
       </div>
       <button class="btn btn-primary" onclick="estimateAndExecute('both')" style="background:#7c3aed">⚡ Translate + Clean</button>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:12px;cursor:pointer;">
-        <input type="checkbox" id="batch-mode"> 🔄 Batch mode (500+ rows, background processing)
+        <input type="checkbox" id="batch-mode"> 🔄 Large table? Process in background & email when ready (500+ rows)
       </label>
     </div>
 
@@ -794,7 +799,7 @@ async function startDemo() {
       `<span class="chip ${state.selectedFields.includes(f.name)?'selected':''}" onclick="toggleField('${f.name.replace(/'/g,"\\'")}',this)" title="${f.type}">${f.name}</span>`
     ).join('');
     renderDemoTable();
-    toast('🧪 Demo mode started! 3 free translations & cleanings');
+    toast('🧪 Demo mode started! 3 free translations & cleanings'); document.getElementById('demo-pricing-note').classList.remove('hidden');
   } catch(e) { toast('❌ 演示启动失败: '+e.message,'error'); }
 }
 
@@ -820,6 +825,11 @@ function updateDemoCounter() {
 }
 
 function resetDemo() {
+  // Hide demo pricing note
+  const note = document.getElementById('demo-pricing-note');
+  if (note) note.classList.add('hidden');
+  const cta = document.getElementById('demo-cta-next');
+  if (cta) cta.remove();
   isDemo = false; demoSid = ''; state = { pat:'', baseId:'', tables:[], fields:[], records:[], selectedFields:[], lastEstimate:null, lastResults:null, pendingAction:null };
   demoLimits = { translateLeft:5, cleanLeft:5, maxPerType:5 };
   document.getElementById('demo-banner').classList.add('hidden');
