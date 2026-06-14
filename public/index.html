@@ -480,8 +480,10 @@ function logout() {
 
 async function onAuthSuccess() {
   document.getElementById('section-auth').classList.add('hidden');
-  document.getElementById('section-hero').classList.add('hidden');
-    document.getElementById('app-sections').classList.remove('hidden');
+  document.getElementById('app-sections').classList.remove('hidden');
+    // Hide the hero demo button but keep the heading
+    var heroDemoBtn = document.querySelector('#section-hero .hero-demo-btn');
+    if (heroDemoBtn) heroDemoBtn.style.display = 'none';
   document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
   document.getElementById('btn-dashboard').classList.remove('hidden');
   document.getElementById('btn-templates').classList.remove('hidden');
@@ -852,8 +854,10 @@ async function startDemo() {
 
     // Update UI
     document.getElementById('section-auth').classList.add('hidden');
-    document.getElementById('section-hero').classList.add('hidden');
     document.getElementById('app-sections').classList.remove('hidden');
+    // Hide the hero demo button but keep the heading
+    var heroDemoBtn = document.querySelector('#section-hero .hero-demo-btn');
+    if (heroDemoBtn) heroDemoBtn.style.display = 'none';
     document.getElementById('demo-banner').classList.remove('hidden');
     document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
     document.getElementById('btn-logout').textContent = 'End Demo';
