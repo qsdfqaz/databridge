@@ -1998,7 +1998,7 @@ app.listen(PORT, () => {
   console.log('🔐 Auth: JWT (email + password + email verification)');
   console.log('🛡️  Rate limit: 10 req/min/user · Daily cap $50 · Monthly cap $500');
   console.log(`💰 Pricing: translate $${PRICE_TRANSLATION_PER_M}/M chars (~￥1/50万字) · clean $${PRICE_CLEAN_PER_1K_TOKENS}/1K tokens`);
-  console.log(`💳 Topup: $2 (trial) | $10 (+$2) | $50 (+$15) | $100 (+$40) — first-time +50% bonus`);
+  console.log(`💳 Topup: $2 (trial) | $10 (+$2) | $50 (+$15) | $100 (+$40) — first-time +20% bonus`);
   console.log(`🎁 Demo signup: $1 free credit`);
   console.log(`💳 Stripe: ${stripe ? '✅ configured' : '❌ NOT SET (simulated checkout)'}`);
   console.log(`📧 Email: ${mailer ? '✅ SMTP configured' : '❌ NOT SET (verification skipped)'}`);
