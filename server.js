@@ -146,7 +146,27 @@ setInterval(() => {
 
 // ── Helpers ──
 function readJSON(f) { try { return JSON.parse(fs.readFileSync(f, 'utf-8')); } catch { return f === USERS_FILE ? {} : []; } }
-function writeJSON(f, d) { fs.writeFileSync(f, JSON.stringify(d, null, 2)); }
+// Backup directory
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+
+function writeJSON(f, d) {
+  // Write main file
+  fs.writeFileSync(f, JSON.stringify(d, null, 2));
+  // Auto-backup users and reports
+  const basename = path.basename(f, '.json');
+  if (basename === 'users' || basename === 'reports') {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const backupFile = path.join(BACKUP_DIR, `${basename}_${ts}.json`);
+    fs.writeFileSync(backupFile, JSON.stringify(d, null, 2));
+    // Keep only last 10 backups per type
+    const backups = fs.readdirSync(BACKUP_DIR)
+      .filter(b => b.startsWith(basename + '_'))
+      .sort()
+      .reverse();
+    backups.slice(10).forEach(b => fs.unlinkSync(path.join(BACKUP_DIR, b)));
+  }
+}
 
 function estimateTokens(text) {
   const hasCJK = /[一-鿿]/.test(text);
@@ -1152,6 +1172,26 @@ function adminAuth(req, res, next) {
   res.status(401).json({ error: '管理员密码错误' });
 }
 
+// Backup management
+app.get('/api/admin/backups', adminAuth, (req, res) => {
+  const files = fs.readdirSync(BACKUP_DIR).sort().reverse();
+  const list = files.map(f => ({
+    name: f,
+    size: fs.statSync(path.join(BACKUP_DIR, f)).size,
+    time: fs.statSync(path.join(BACKUP_DIR, f)).mtime
+  }));
+  res.json({ count: list.length, backups: list });
+});
+
+app.get('/api/admin/backups/download', adminAuth, (req, res) => {
+  const name = req.query.file;
+  if (!name) return res.status(400).json({ error: '?file=filename required' });
+  const filePath = path.join(BACKUP_DIR, name);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
+  res.download(filePath);
+});
+
+// Health check includes backup status
 app.get('/api/admin/stats', adminAuth, (req, res) => {
   const users = readJSON(USERS_FILE);
   const usage = readJSON(USAGE_FILE);
@@ -1161,8 +1201,10 @@ app.get('/api/admin/stats', adminAuth, (req, res) => {
   const rev = parseFloat(thisMonth.reduce((s,u)=>s+(u.cost||0),0).toFixed(2));
   const wholesale = parseFloat(thisMonth.reduce((s,u)=>s+(u.wholesaleCost||0),0).toFixed(2));
   const activeIds = [...new Set(usage.filter(u=>(now-new Date(u.timestamp))<7*86400000).map(u=>u.userId))];
+  const backupFiles = fs.readdirSync(BACKUP_DIR);
   res.json({
     totalUsers: userList.length, verifiedUsers: userList.filter(u=>u.emailVerified).length, activeThisWeek: activeIds.length,
+    backups: backupFiles.length, lastBackup: backupFiles.length ? backupFiles.sort().reverse()[0] : 'none',
     monthlyRevenue: rev, monthlyWholesale: wholesale, monthlyProfit: parseFloat((rev-wholesale).toFixed(2)),
     margin: rev>0?Math.round((rev-wholesale)/rev*100):0,
     totalBalance: parseFloat(userList.reduce((s,u)=>s+(u.balance||0),0).toFixed(2)),
