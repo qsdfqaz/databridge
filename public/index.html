@@ -199,7 +199,8 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
         <div style="font-size:12px;color:#a16207;"><span id="demo-counter">Translate 0/3 · Clean 0/3</span> · Free, no charge</div>
       </div>
     </div>
-    <button class="btn btn-primary" id="btn-connect-cta-demo" onclick="showConnectModal()" style="background:#7c3aed;font-size:13px;white-space:nowrap;">🚀 Connect your own Airtable</button>
+    <button class="btn btn-primary" id="btn-connect-cta-demo" onclick="showConnectModal()" style="background:linear-gradient(135deg,#7c3aed,#a855f7);font-size:14px;white-space:nowrap;padding:8px 18px;box-shadow:0 2px 8px rgba(124,58,237,0.3);">⚡ Connect your own Airtable</button>
+    <span style="font-size:11px;color:var(--muted);margin-left:12px;">Already have an account? <a href="#" onclick="showLoginFromDemo()" style="color:var(--accent);font-weight:600;">Log in</a> or <a href="#" onclick="showRegisterFromDemo()" style="color:var(--accent);font-weight:600;">Sign up</a></span>
   </div>
 
   <!-- App sections (hidden until auth/demo) -->
@@ -479,7 +480,7 @@ function logout() {
 }
 
 async function onAuthSuccess() {
-  document.getElementById('section-auth').classList.add('hidden');
+  document.getElementById('section-auth').classList.add('hidden'); document.getElementById('section-auth').style.display='none';
   document.getElementById('app-sections').classList.remove('hidden');
     // Hide the hero demo button but keep the heading
     var heroDemoBtn = document.querySelector('#section-hero .hero-demo-btn');
@@ -853,7 +854,7 @@ async function startDemo() {
     state.fields = data.fields; state.records = data.records;
 
     // Update UI
-    document.getElementById('section-auth').classList.add('hidden');
+    document.getElementById('section-auth').classList.add('hidden'); document.getElementById('section-auth').style.display='none';
     document.getElementById('app-sections').classList.remove('hidden');
     // Hide the hero demo button but keep the heading
     var heroDemoBtn = document.querySelector('#section-hero .hero-demo-btn');
@@ -886,16 +887,24 @@ async function startDemo() {
 }
 
 function renderDemoTable() {
-  const records = state.records;
+  var records = state.records;
   if (!records.length) return;
-  const keys = [...new Set(records.flatMap(r=>Object.keys(r)))].filter(k=>k!=='id').slice(0,6);
-  let html = '<table><thead><tr><th>#</th>'+keys.map(k=>`<th>${k}</th>`).join('')+'</tr></thead><tbody>';
-  records.forEach((r,i)=>{
-    html += '<tr><td>'+(i+1)+'</td>'+keys.map(k=>`<td>${r[k]!==undefined&&r[k]!==null?String(r[k]).slice(0,60):'<span style="color:var(--muted)">—</span>'}</td>`).join('')+'</tr>';
+  // Use selected fields, deduplicate, limit to 5 for readability
+  var seen = {};
+  var keys = state.selectedFields.filter(function(f) {
+    var norm = f.toLowerCase().replace(/[^a-z0-9]/g,'');
+    if (seen[norm]) return false;
+    seen[norm] = true;
+    return true;
+  }).slice(0, 5);
+  var formatKey = function(k) { return k.replace(/_/g,' ').replace(/([a-z])([A-Z])/g,'$1 $2').replace(/\w/g, function(c) { return c.toUpperCase(); }); };
+  var html = '<table><thead><tr><th>#</th>'+keys.map(function(k){return '<th>'+formatKey(k)+'</th>';}).join('')+'</tr></thead><tbody>';
+  records.forEach(function(r,i) {
+    html += '<tr><td>'+(i+1)+'</td>'+keys.map(function(k){var v=r[k]; return '<td>'+(v!==undefined&&v!==null?String(v).slice(0,80):'<span style="color:var(--muted)">-</span>')+'</td>';}).join('')+'</tr>';
   });
   html += '</tbody></table>';
   document.getElementById('table-container').innerHTML = html;
-  document.getElementById('record-info').textContent = `${records.length} sample records · ${state.selectedFields.length} fields`;
+  document.getElementById('record-info').textContent = records.length + ' sample records - ' + state.selectedFields.length + ' fields';
 }
 
 function updateDemoCounter() {
