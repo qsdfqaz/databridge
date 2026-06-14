@@ -402,6 +402,43 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
 
 <script>
 // ── Forgot Password ──
+function showLoginFromDemo() {
+  document.getElementById('demo-banner').classList.add('hidden');
+  document.getElementById('app-sections').classList.add('hidden');
+  var sa = document.getElementById('section-auth');
+  sa.classList.remove('hidden'); sa.style.display = 'block';
+  document.getElementById('section-hero').classList.remove('hidden');
+  var heroBtn = document.getElementById('hero-demo-btn-main');
+  if (heroBtn) heroBtn.style.display = '';
+  isDemo = false; demoSid = null; state.pat = ''; state.baseId = '';
+  document.getElementById('tab-login').click();
+  sa.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function showRegisterFromDemo() {
+  document.getElementById('demo-banner').classList.add('hidden');
+  document.getElementById('app-sections').classList.add('hidden');
+  var sa = document.getElementById('section-auth');
+  sa.classList.remove('hidden'); sa.style.display = 'block';
+  document.getElementById('section-hero').classList.remove('hidden');
+  var heroBtn = document.getElementById('hero-demo-btn-main');
+  if (heroBtn) heroBtn.style.display = '';
+  isDemo = false; demoSid = null; state.pat = ''; state.baseId = '';
+  document.getElementById('tab-register').click();
+  sa.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function showConnectModal() {
+  document.getElementById('demo-banner').classList.add('hidden');
+  var sc = document.getElementById('section-connect');
+  sc.classList.remove('hidden');
+  sc.scrollIntoView({behavior:'smooth',block:'center'});
+  var note = document.getElementById('demo-pricing-note');
+  if (note) note.classList.add('hidden');
+  var cta = document.getElementById('demo-cta-next');
+  if (cta) cta.remove();
+}
+
 function showForgotPassword(){document.getElementById('modal-forgot').classList.remove('hidden');document.getElementById('forgot-step1').classList.remove('hidden');document.getElementById('forgot-step2').classList.add('hidden');}
 async function sendResetCode(){const e=document.getElementById('forgot-email').value.trim();if(!e)return toast('Enter your email','error');await api('/api/auth/forgot-password',{method:'POST',body:JSON.stringify({email:e})});toast('验证码已发送 Code sent');document.getElementById('forgot-step1').classList.add('hidden');document.getElementById('forgot-step2').classList.remove('hidden');}
 async function doResetPassword(){const e=document.getElementById('forgot-email').value.trim(),c=document.getElementById('forgot-code').value.trim(),p=document.getElementById('forgot-new-password').value;if(!c||!p)return toast('Please fill all fields','error');if(p.length<6)return toast('Password must be 6+ characters','error');const r=await api('/api/auth/reset-password',{method:'POST',body:JSON.stringify({email:e,code:c,newPassword:p})});if(r.success){toast('密码已重置 Password reset!');document.getElementById('modal-forgot').classList.add('hidden');}}
