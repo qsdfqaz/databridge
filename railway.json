@@ -1,0 +1,13 @@
+{
+  "build": {
+    "builder": "nixpacks"
+  },
+  "deploy": {
+    "startCommand": "node server.js"
+  },
+  "volumes": {
+    "data": {
+      "mountPath": "/app/data"
+    }
+  }
+}
