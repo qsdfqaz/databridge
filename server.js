@@ -1152,6 +1152,20 @@ function adminAuth(req, res, next) {
   res.status(401).json({ error: '管理员密码错误' });
 }
 
+app.post('/api/admin/reset-pwd', adminAuth, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+    const users = readJSON(USERS_FILE);
+    const user = Object.values(users).find(u => u.email === email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    user.passwordHash = await bcrypt.hash(password, 10);
+    user.emailVerified = true;
+    writeJSON(USERS_FILE, users);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/admin/stats', adminAuth, (req, res) => {
   const users = readJSON(USERS_FILE);
   const usage = readJSON(USAGE_FILE);
