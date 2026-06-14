@@ -1046,11 +1046,17 @@ async function estimateAndExecute(action) {
 
     document.getElementById('section-ops').classList.add('loading');
     try {
+      // Send actual records (from CSV, Google Sheets, or demo data)
+      var realRecords = state.records.map(function(r) {
+        var o = {}; state.selectedFields.forEach(function(f) { if (r[f] !== undefined) o[f] = r[f]; });
+        return o;
+      });
       const res = await fetch(API+'/api/demo/execute', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           sessionId: demoSid, action,
           fields: state.selectedFields,
+          records: realRecords,
           sourceLang: document.getElementById('trans-source').value,
           targetLang: document.getElementById('trans-target').value,
           cleaningInstruction: document.getElementById('clean-instruction').value||'Clean data'
@@ -1293,7 +1299,7 @@ async function startDemo() {
     document.getElementById('conn-status').textContent = '🧪 Demo Data';
     document.getElementById('conn-status').className = 'status-badge ok';
     document.getElementById('header-base-info').textContent = '📁 Sales Leads (Sample)';
-    document.getElementById('section-connect').classList.add('hidden');
+    // Keep section-connect visible so users can switch to Google Sheets/CSV
     document.getElementById('section-ops').classList.remove('hidden');
     document.getElementById('section-table').classList.remove('hidden');
     document.getElementById('table-placeholder').classList.add('hidden');

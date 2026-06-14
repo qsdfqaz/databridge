@@ -1128,8 +1128,10 @@ app.post('/api/demo/execute', async (req, res) => {
       }
     }
 
-    // Use mock records
-    const records = DEMO_RECORDS.map(r => { const o = {}; fields.forEach(f => { if (r[f] !== undefined) o[f] = r[f]; }); return o; });
+    // Use provided records (CSV, Google Sheets, or fallback to demo data)
+    const records = (req.body.records && req.body.records.length)
+      ? req.body.records
+      : DEMO_RECORDS.map(r => { const o = {}; fields.forEach(f => { if (r[f] !== undefined) o[f] = r[f]; }); return o; });
     const results = { cleaned: {}, translated: {} };
 
     // Demo uses real DeepSeek for best impression — cost is negligible (~$0.01/demo user)
