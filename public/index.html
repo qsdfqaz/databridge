@@ -480,7 +480,8 @@ function logout() {
 
 async function onAuthSuccess() {
   document.getElementById('section-auth').classList.add('hidden');
-  document.getElementById('app-sections').classList.remove('hidden');
+  document.getElementById('section-hero').classList.add('hidden');
+    document.getElementById('app-sections').classList.remove('hidden');
   document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-topup-header').style.display='';document.getElementById('btn-change-pwd').classList.remove('hidden');
   document.getElementById('btn-dashboard').classList.remove('hidden');
   document.getElementById('btn-templates').classList.remove('hidden');
@@ -851,6 +852,7 @@ async function startDemo() {
 
     // Update UI
     document.getElementById('section-auth').classList.add('hidden');
+    document.getElementById('section-hero').classList.add('hidden');
     document.getElementById('app-sections').classList.remove('hidden');
     document.getElementById('demo-banner').classList.remove('hidden');
     document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-topup-header').style.display='';document.getElementById('btn-change-pwd').classList.remove('hidden');
