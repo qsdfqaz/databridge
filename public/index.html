@@ -110,6 +110,8 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -206,7 +208,12 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
   <div id="app-sections" class="hidden">
     <!-- Connect -->
     <div class="card" id="section-connect">
-      <h3>Connect Airtable</h3>
+      <h3>Connect Data Source</h3>
+      <div style="display:flex;gap:0;margin-bottom:20px;">
+        <button class="btn btn-sm" id="tab-source-airtable" onclick="switchDataSource('airtable')" style="border-radius:8px 0 0 8px;background:var(--accent-light);border-color:var(--accent);color:var(--accent);">📡 Airtable</button>
+        <button class="btn btn-sm btn-outline" id="tab-source-file" onclick="switchDataSource('file')" style="border-radius:0 8px 8px 0;">📂 Upload CSV/Excel</button>
+      </div>
+      <div id="source-airtable">
       <p class="desc">Enter your Airtable PAT and Base ID to get started</p>
       <div class="form-row">
         <div class="form-group" style="flex:1;min-width:240px"><label>Airtable PAT</label><input type="password" id="input-pat" placeholder="pat..."></div>
@@ -215,6 +222,18 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
       </div>
       <p style="font-size:11px;color:var(--muted);">① <a href="https://airtable.com/create/tokens" target="_blank" style="color:var(--accent);font-weight:600;">Click here to create a PAT on Airtable ↗</a><br>② Copy-paste it below. We only need <strong>read & write data</strong> permission.</p><div style="margin-top:8px;"><button class="btn btn-sm btn-outline" onclick="document.getElementById('pat-tutorial').classList.toggle('hidden')" style="font-size:11px;">📖 How to get your PAT (step-by-step)</button><div id="pat-tutorial" class="hidden" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:6px;font-size:12px;color:var(--text);line-height:1.8;"><strong>1.</strong> <a href="https://airtable.com/create/tokens" target="_blank" style="color:var(--accent);">Open Airtable token page ↗</a> (new tab)<br><strong>2.</strong> Click <strong>"Create new token"</strong>, name it "TableTurn"<br><strong>3.</strong> Check these boxes:<br>　☑ <code>data.records:read</code><br>　☑ <code>data.records:write</code><br>　☑ <code>schema.bases:read</code><br><strong>4.</strong> Copy the token (starts with <code>pat...</code>) and paste it above<br><strong>5.</strong> Find your Base ID from the URL:<br>　<code>airtable.com/<mark>appXXXXXXX</mark>/tableName</code></div></div>
 <p style="font-size:11px;color:var(--accent);margin-top:4px;">🔒 Your PAT is stored only in your browser and never sent to our server.</p>
+      </div><!-- /source-airtable -->
+      <div id="source-file" class="hidden">
+        <p class="desc">Drag & drop a CSV or Excel file — no account needed</p>
+        <div id="file-drop-zone" style="border:2px dashed var(--border);border-radius:var(--radius);padding:40px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);" onclick="document.getElementById('file-input').click()">
+          <div style="font-size:40px;margin-bottom:8px;">📂</div>
+          <strong style="color:var(--text);">Click to upload or drag & drop</strong>
+          <p style="font-size:12px;color:var(--muted);margin-top:4px;">CSV, XLSX, XLS — max 10MB</p>
+          <input type="file" id="file-input" accept=".csv,.xlsx,.xls" style="display:none;" onchange="handleFileUpload(this.files[0])">
+        </div>
+        <div id="file-preview" class="hidden" style="margin-top:12px;"></div>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px;">🔒 File processed locally in your browser — never uploaded to our server</p>
+      </div>
     </div>
 
     <!-- Table -->
@@ -685,6 +704,100 @@ window.addEventListener('popstate', function(e) {
   }
 });
 
+// ── Data Source Switching ──
+var currentDataSource = 'airtable';
+function switchDataSource(source) {
+  currentDataSource = source;
+  document.getElementById('source-airtable').classList.toggle('hidden', source !== 'airtable');
+  document.getElementById('source-file').classList.toggle('hidden', source !== 'file');
+  document.getElementById('tab-source-airtable').style.background = source === 'airtable' ? 'var(--accent-light)' : '';
+  document.getElementById('tab-source-airtable').style.borderColor = source === 'airtable' ? 'var(--accent)' : 'var(--border)';
+  document.getElementById('tab-source-airtable').style.color = source === 'airtable' ? 'var(--accent)' : 'var(--muted)';
+  document.getElementById('tab-source-file').style.background = source === 'file' ? 'var(--accent-light)' : '';
+  document.getElementById('tab-source-file').style.borderColor = source === 'file' ? 'var(--accent)' : 'var(--border)';
+  document.getElementById('tab-source-file').style.color = source === 'file' ? 'var(--accent)' : 'var(--muted)';
+}
+
+// File upload drag & drop
+(function() {
+  var zone = document.getElementById('file-drop-zone');
+  if (!zone) return;
+  zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; zone.style.background = 'var(--accent-light)'; });
+  zone.addEventListener('dragleave', function(e) { e.preventDefault(); zone.style.borderColor = 'var(--border)'; zone.style.background = 'var(--bg)'; });
+  zone.addEventListener('drop', function(e) { e.preventDefault(); zone.style.borderColor = 'var(--border)'; zone.style.background = 'var(--bg)'; if (e.dataTransfer.files[0]) handleFileUpload(e.dataTransfer.files[0]); });
+})();
+
+function handleFileUpload(file) {
+  if (!file) return;
+  var ext = file.name.split('.').pop().toLowerCase();
+  if (!['csv','xlsx','xls'].includes(ext)) return toast('Please upload CSV or Excel file','error');
+  if (file.size > 10 * 1024 * 1024) return toast('File too large (max 10MB)','error');
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var data = e.target.result;
+    var records = [];
+    try {
+      if (ext === 'csv') {
+        var parsed = Papa.parse(data, { header: true, skipEmptyLines: true, trimHeaders: true });
+        records = parsed.data.filter(function(r) { return Object.values(r).some(function(v) { return v !== '' && v !== null; }); });
+      } else {
+        var wb = XLSX.read(data, { type: 'array' });
+        var sheet = wb.Sheets[wb.SheetNames[0]];
+        records = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      }
+    } catch(err) { return toast('Failed to parse file: ' + err.message, 'error'); }
+
+    if (!records.length) return toast('No data found in file','error');
+
+    // Populate state
+    state.pat = 'file_upload';
+    state.baseId = 'file_' + Date.now().toString(36);
+    state.records = records;
+    var allKeys = Object.keys(records[0]);
+    state.selectedFields = allKeys.slice(0, 5);
+    state.fields = allKeys.map(function(k) { return { id: 'fld_' + k, name: k, type: 'singleLineText' }; });
+
+    // Update UI
+    document.getElementById('conn-status').textContent = '📂 File Loaded';
+    document.getElementById('conn-status').className = 'status-badge ok';
+    document.getElementById('header-base-info').textContent = '📁 ' + file.name;
+    document.getElementById('section-table').classList.remove('hidden');
+    document.getElementById('table-placeholder').classList.add('hidden');
+    document.getElementById('section-ops').classList.remove('hidden');
+
+    // Render table
+    document.getElementById('select-table').innerHTML = '<option value="' + state.baseId + '">' + file.name + '</option>';
+    document.getElementById('field-chips').innerHTML = allKeys.map(function(k) {
+      return '<span class="chip ' + (state.selectedFields.includes(k) ? 'selected' : '') + '" onclick="toggleField(\'' + k.replace(/'/g, "\\'") + '\',this)">' + k + '</span>';
+    }).join('');
+
+    var keys = allKeys.slice(0, 8);
+    var html = '<table><thead><tr><th>#</th>' + keys.map(function(k) { return '<th>' + k + '</th>'; }).join('') + '</tr></thead><tbody>';
+    records.slice(0, 25).forEach(function(r, i) {
+      html += '<tr><td>' + (i+1) + '</td>' + keys.map(function(k) { var v = r[k]; return '<td>' + (v !== undefined && v !== null ? String(v).slice(0, 80) : '<span style="color:var(--muted)">-</span>') + '</td>'; }).join('') + '</tr>';
+    });
+    html += '</tbody></table>';
+    document.getElementById('table-container').innerHTML = html;
+    document.getElementById('record-info').textContent = records.length + ' rows · ' + allKeys.length + ' columns';
+
+    // Show file preview
+    var preview = document.getElementById('file-preview');
+    preview.classList.remove('hidden');
+    preview.innerHTML = '<span style="color:var(--green);">✅ ' + file.name + ' (' + records.length + ' rows, ' + allKeys.length + ' columns)</span>';
+
+    toast('✅ ' + records.length + ' rows loaded from ' + file.name, 'success');
+    // Auto-create demo session if not logged in
+    if (!token) {
+      fetch('/api/demo/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { demoSid = d.sessionId; isDemo = true; });
+    }
+  };
+  if (ext === 'csv') { reader.readAsText(file); }
+  else { reader.readAsArrayBuffer(file); }
+}
+
 // ── Connect ──
 async function connectAirtable() {
   const pat = document.getElementById('input-pat').value.trim();
@@ -773,6 +886,15 @@ async function estimateAndExecute(action) {
   if (!state.selectedFields.length) return toast('Please select fields','error');
   if (!state.records.length) return toast('Please load data first','error');
   state.pendingAction = action;
+
+  // ── File upload without login: need to register to execute ──
+  if (!isDemo && !token && state.pat === 'file_upload') {
+    toast('Register (free) to translate & clean your data. Reports and preview work without login.', 'error');
+    document.getElementById('modal-upgrade').querySelector('h4').textContent = '📂 File Uploaded!';
+    document.getElementById('modal-upgrade').querySelector('.desc').innerHTML = 'Your data is ready. Register (free, no credit card) to translate, clean, and generate reports.<br><br>🎁 <strong>Get $1 free credit</strong> when you sign up.';
+    document.getElementById('modal-upgrade').classList.remove('hidden');
+    return;
+  }
 
   // ── Demo mode: skip estimate, execute directly (free) ──
   if (isDemo) {
