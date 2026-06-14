@@ -1466,7 +1466,7 @@ app.get('/api/documents/templates', (req, res) => {
   res.json({ templates: DOC_TEMPLATES });
 });
 
-app.post('/api/documents/generate', authRequired, async (req, res) => {
+app.post('/api/documents/generate', async (req, res) => {
   try {
     const { templateId, records, fields } = req.body;
     const template = DOC_TEMPLATES.find(t => t.id === templateId);
