@@ -1354,6 +1354,11 @@ app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
+// ── Landing pages ──
+app.get('/for/exporters', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'exporters.html'));
+});
+
 // ── Legal pages ──
 app.get('/terms', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Terms of Service — TableTurn</title>
