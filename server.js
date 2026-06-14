@@ -330,12 +330,20 @@ async function translateWithDeepL(texts, sourceLang, targetLang) {
   return data.translations.map(t => t.text);
 }
 
+// ── Cache-optimized prompts (fixed prefixes for DeepSeek prefix caching) ──
+const TRANSLATE_SYSTEM = 'You are a professional translator. Translate each text to the target language specified. Return ONLY a JSON array of strings, nothing else. Preserve formatting, numbers, and special characters exactly.';
+const CLEAN_SYSTEM = 'You are a data cleaning tool. Clean data according to the instruction provided. Return ONLY a JSON array with cleaned values for each record, in the same order. No other text.';
+const INSIGHT_SYSTEM = 'You are a data analyst. Write 2-3 sentences of actionable insights about the provided data. Be specific with actual values. Output plain text only.';
+const DOC_SYSTEM = 'You are a professional document generator. Return valid HTML for the requested document. Use h1, h2, p, table, ul, li tags. Include inline CSS for a clean, professional look. No markdown fences.';
+const DOC_CUSTOM_SYSTEM = 'You are a professional document generator. Return valid HTML for the requested document. Use h1, h2, p, table, ul, li tags. Include inline CSS for a clean, professional look. No markdown fences.';
+
 async function translateWithLLM(texts, targetLang) {
   const names = { ZH: 'Simplified Chinese', EN: 'English', JA: 'Japanese', KO: 'Korean', FR: 'French', DE: 'German' };
   const targetName = names[targetLang] || targetLang;
+  // Fixed system + fixed user prefix → high cache hit rate
   const data = await llmChat([
-    { role: 'system', content: `You are a professional translator. Translate each text to ${targetName}. Return ONLY a JSON array of strings, nothing else.` },
-    { role: 'user', content: `Translate:\n${JSON.stringify(texts)}` }
+    { role: 'system', content: TRANSLATE_SYSTEM },
+    { role: 'user', content: `Target language: ${targetName}\n\nTranslate each text below:\n${JSON.stringify(texts)}` }
   ], 2000);
   const c = data.choices[0].message.content.trim();
   const m = c.match(/\[[\s\S]*\]/);
@@ -344,17 +352,12 @@ async function translateWithLLM(texts, targetLang) {
 
 // ── Cleaning ──
 async function cleanWithLLM(records, instruction, fieldsToClean) {
-  const prompt = `Clean this data according to: "${instruction}"
-
-Fields to clean: ${fieldsToClean.join(', ')}
-Records:
-${JSON.stringify(records.map(r => { const o = {}; fieldsToClean.forEach(f => { if (r[f] !== undefined) o[f] = r[f]; }); return o; }), null, 2)}
-
-Return ONLY a JSON array with cleaned values for each record. No other text.`;
-
+  // Fixed system + structured user prefix → cache-friendly
+  const instructionLine = `Instruction: ${instruction}`;
+  const fieldsLine = `Fields to clean: ${fieldsToClean.join(', ')}`;
   const data = await llmChat([
-    { role: 'system', content: 'You are a precise data cleaning tool. Return valid JSON arrays only.' },
-    { role: 'user', content: prompt }
+    { role: 'system', content: CLEAN_SYSTEM },
+    { role: 'user', content: `${instructionLine}\n${fieldsLine}\n\nRecords to clean:\n${JSON.stringify(records.map(r => { const o = {}; fieldsToClean.forEach(f => { if (r[f] !== undefined) o[f] = r[f]; }); return o; }), null, 2)}\n\nReturn ONLY a JSON array with cleaned values for each record.` }
   ], 4000);
   const content = data.choices[0].message.content.trim();
   const m = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
@@ -1730,7 +1733,7 @@ app.post('/api/reports/:id/insights', async (req, res) => {
     try {
       const sample = records.slice(0, 10).map(r => ({ [xField]: r[xField], [yField]: r[yField] }));
       const aiResp = await llmChat([
-        { role:'system', content:'You are a data analyst. Write 2-3 sentences of actionable insights about this data in plain English. Be specific — mention actual values and trends. Keep it under 150 words. Return only the text, no markdown.' },
+        { role:'system', content: INSIGHT_SYSTEM },
         { role:'user', content: `Analyze this data:\nField: ${yField} by ${xField}\nRecords: ${JSON.stringify(sample)}\nStats: sum=${sum.toFixed(2)}, avg=${avg.toFixed(2)}, max=${max.toFixed(2)}, min=${min.toFixed(2)}, count=${values.length}` }
       ], 500);
       aiText = aiResp.choices[0].message.content.trim();
@@ -1966,7 +1969,7 @@ app.post('/api/documents/generate', async (req, res) => {
     if (template.id === 'summary') {
       // AI summary mode
       const aiResp = await llmChat([
-        { role:'system', content: 'You are a business analyst. Write a clear, professional executive summary in HTML format (use h2, p, ul, li tags). No markdown, just HTML.' },
+        { role:'system', content: DOC_SYSTEM },
         { role:'user', content: `${template.prompt}\n\nData:\n${JSON.stringify(records.slice(0,10))}` }
       ], 2000);
       html = aiResp.choices[0].message.content.trim();
