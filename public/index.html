@@ -137,7 +137,16 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
   <!-- Hero Section -->
   <div class="hero-section" id="section-hero">
     <h1>Turn your tables<br>into <span>insights</span>.</h1>
-    <p class="hero-desc">DeepSeek V4 Pro-powered data cleaning, translation, and reporting for Airtable &amp; beyond.</p>
+    <p class="hero-desc">Powered by <a href="javascript:void(0)" onclick="document.getElementById('deepseek-about').classList.toggle('hidden')" style="color:#a78bfa;text-decoration:underline;cursor:pointer;">DeepSeek V4 Pro</a> — data cleaning, translation, and reporting for Airtable &amp; beyond.</p>
+    <div id="deepseek-about" class="hidden" style="max-width:550px;margin:0 auto 0;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-align:left;font-size:12px;color:var(--muted);line-height:1.8;">
+      <strong style="color:#a78bfa;">Why DeepSeek V4 Pro?</strong><br>
+      🏆 Matches GPT-4 on translation & reasoning benchmarks<br>
+      ⚡ 2x faster than OpenAI for the same quality<br>
+      💰 10-20x cheaper — savings passed to you<br>
+      🌏 #1 for Chinese ↔ English translation accuracy<br>
+      🔓 Open-weight model, audited by the AI community<br>
+      <span style="color:var(--text);">It's the engine behind every translation, cleaning, and insight on TableTurn.</span>
+    </div>
     <button class="btn hero-demo-btn" id="hero-demo-btn-main" onclick="startDemo()">🧪 Try Live Demo — 3 Free, No Login</button>
     <p style="font-size:12px;color:var(--muted);margin-top:10px;">Sample data included · 3 free translations + 3 free cleanings · No registration</p>
   </div>
