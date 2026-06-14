@@ -17,8 +17,26 @@
 <link rel="canonical" href="https://www.tturn.xyz">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"TableTurn","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"AI-powered data cleaning and translation tool for Airtable. Bulk translate and clean your Airtable data with DeepSeek V4 Pro.","url":"https://www.tturn.xyz","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Organization","name":"TableTurn"}}
+
+// Handle browser back button from demo mode
+window.addEventListener('popstate', function(e) {
+  if (isDemo) {
+    resetDemo();
+    window._demoPushed = false;
+  }
+});
+
 </script>
-<script src="/i18n.js"></script>
+<script src="/i18n.js">
+// Handle browser back button from demo mode
+window.addEventListener('popstate', function(e) {
+  if (isDemo) {
+    resetDemo();
+    window._demoPushed = false;
+  }
+});
+
+</script>
 <style>
 :root {
   --bg:#0a0a0f; --bg2:#131320; --surface:#1a1a2e; --border:#2a2a4a;
@@ -920,6 +938,8 @@ async function startDemo() {
     ).join('');
     renderDemoTable();
     toast('🧪 Demo mode started! 3 free translations & cleanings'); document.getElementById('demo-pricing-note').classList.remove('hidden');
+    // Push state so back button exits demo
+    if (!window._demoPushed) { window._demoPushed = true; history.pushState({demo:true}, '', '#demo'); }
   } catch(e) { toast('❌ 演示启动失败: '+e.message,'error'); }
 }
 
@@ -953,6 +973,8 @@ function updateDemoCounter() {
 }
 
 function resetDemo() {
+  window._demoPushed = false;
+  history.replaceState(null, '', window.location.pathname);
   // Hide demo pricing note
   const note = document.getElementById('demo-pricing-note');
   if (note) note.classList.add('hidden');
@@ -1259,6 +1281,15 @@ function applyI18nHTML() {
 }
 
 document.addEventListener('DOMContentLoaded', applyI18nHTML);
+
+// Handle browser back button from demo mode
+window.addEventListener('popstate', function(e) {
+  if (isDemo) {
+    resetDemo();
+    window._demoPushed = false;
+  }
+});
+
 </script>
 
   <!-- Preview modal -->
