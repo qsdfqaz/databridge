@@ -290,7 +290,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
     <!-- Operations -->
     <div class="card hidden" id="section-ops">
       <h3>⚡ Actions</h3>
-      <p class="desc" id="pricing-desc" style="font-size:12px;">💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>$15/mo</strong> (1M chars + 100K tokens) · 👥 Team: <strong>$45/mo</strong> (5 seats, shared pool) <a href="mailto:support@databridge.app" style="color:var(--accent);font-size:11px;">Contact us</a></p><p id="demo-pricing-note" class="hidden" style="font-size:11px;color:#f59e0b;margin-top:2px;">🧪 Demo: Free, no charge — pricing applies only when using your own Airtable data</p>
+      <p class="desc" id="pricing-desc" style="font-size:12px;">💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>$9/mo</strong> (1M chars + 100K tokens) · 👥 Team: <strong>$29/mo</strong> (5 seats, shared pool) <a href="mailto:support@databridge.app" style="color:var(--accent);font-size:11px;">Contact us</a></p><p id="demo-pricing-note" class="hidden" style="font-size:11px;color:#f59e0b;margin-top:2px;">🧪 Demo: Free, no charge — pricing applies only when using your own Airtable data</p>
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px">
         <h4 style="margin-bottom:6px">🌐 Translate</h4>
         <div class="form-row">
@@ -458,7 +458,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
   <div class="modal" style="text-align:center;">
     <div style="font-size:48px;margin-bottom:12px;">🎉</div>
     <h4>You've used your 3 free trials</h4>
-    <p class="desc">Sign up now and get <strong style="color:var(--green);">$1 free credit</strong>.<br><br>⭐ <strong>Pro $15/mo</strong>: 1M chars translate + 100K tokens clean + unlimited reports + AI insights + PDF export + scheduled emails<br>👥 <strong>Team $45/mo</strong>: 5 seats, shared pool<br><br><span style="font-size:11px;color:var(--muted);">No credit card required to start.</span></p>
+    <p class="desc">Sign up now and get <strong style="color:var(--green);">$1 free credit</strong>.<br><br>⭐ <strong>Pro $9/mo</strong>: 1M chars + 100K tokens + unlimited reports + AI insights + 50 docs<br>👥 <strong>Team $29/mo</strong>: 5 seats, 5M chars + 500K tokens shared, 200 docs<br><br><span style="font-size:11px;color:var(--muted);">No credit card required to start.</span></p>
     <div style="display:flex;gap:10px;margin:16px 0;justify-content:center;">
       <div style="text-align:center;padding:12px 16px;background:var(--green-bg);border-radius:var(--radius-sm);">
         <div style="font-size:20px;font-weight:800;color:var(--green);">$1 FREE</div>
@@ -533,7 +533,7 @@ function showLoginFromDemo() {
   if (heroBtn) heroBtn.style.display = '';
   isDemo = false; demoSid = null; state.pat = ''; state.baseId = '';
   var pd = document.getElementById('pricing-desc');
-  if (pd) { pd.style.color = ''; pd.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>$15/mo</strong> (1M chars + 100K tokens + unlimited reports + AI insights + PDF export) · 👥 Team: <strong>$45/mo</strong> (5 seats)'; }
+  if (pd) { pd.style.color = ''; pd.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>$9/mo</strong> · 👥 Team: <strong>$29/mo</strong> (5 seats, 5M chars + 500K tokens shared)'; }
   document.getElementById('tab-login').click();
   sa.scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -548,7 +548,7 @@ function showRegisterFromDemo() {
   if (heroBtn) heroBtn.style.display = '';
   isDemo = false; demoSid = null; state.pat = ''; state.baseId = '';
   var pd = document.getElementById('pricing-desc');
-  if (pd) { pd.style.color = ''; pd.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>$15/mo</strong> (1M chars + 100K tokens + unlimited reports + AI insights + PDF export) · 👥 Team: <strong>$45/mo</strong> (5 seats)'; }
+  if (pd) { pd.style.color = ''; pd.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>$9/mo</strong> · 👥 Team: <strong>$29/mo</strong> (5 seats, 5M chars + 500K tokens shared)'; }
   document.getElementById('tab-register').click();
   sa.scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -1379,7 +1379,7 @@ function resetDemo() {
   document.getElementById('bal-badge').textContent = '💎 $0.00';
   // Restore pricing text
   var pricingDesc = document.getElementById('pricing-desc');
-  if (pricingDesc) { pricingDesc.style.color = ''; pricingDesc.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>$15/mo</strong> (1M chars + 100K tokens + unlimited reports + AI insights + PDF export) · 👥 Team: <strong>$45/mo</strong> (5 seats)'; }
+  if (pricingDesc) { pricingDesc.style.color = ''; pricingDesc.innerHTML = '💰 Translate <strong>$2/M chars</strong> · Clean <strong>$0.40/1K tokens</strong> · ⭐ Pro: <strong>$9/mo</strong> · 👥 Team: <strong>$29/mo</strong> (5 seats, 5M chars + 500K tokens shared)'; }
   // Clean URL hash
   if (window.location.hash === '#demo') { history.replaceState({}, '', '/'); }
   toast('Demo ended. Register to process your own data!');
@@ -1787,7 +1787,7 @@ async function fetchReportInsights(reportId) {
       var insightDiv = document.createElement('div');
       insightDiv.style.cssText = 'margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;';
       if (data.proRequired) {
-        insightDiv.innerHTML = '<h4 style="font-size:13px;color:var(--accent);margin-bottom:6px;">🤖 AI Insights <span style="font-size:11px;color:var(--muted);">(Pro)</span></h4><p style="font-size:13px;line-height:1.7;color:var(--muted);">' + data.insights + '</p><button class="btn btn-sm btn-primary" onclick="showTopupModal()" style="margin-top:8px;">⭐ Upgrade to Pro — $15/month</button>';
+        insightDiv.innerHTML = '<h4 style="font-size:13px;color:var(--accent);margin-bottom:6px;">🤖 AI Insights <span style="font-size:11px;color:var(--muted);">(Pro)</span></h4><p style="font-size:13px;line-height:1.7;color:var(--muted);">' + data.insights + '</p><button class="btn btn-sm btn-primary" onclick="showTopupModal()" style="margin-top:8px;">⭐ Upgrade to Pro — $9/month</button>';
       } else {
         insightDiv.innerHTML = '<h4 style="font-size:13px;color:var(--accent);margin-bottom:6px;">🤖 AI Insights</h4><p style="font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text);">' + data.insights.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p>';
       }
@@ -1924,8 +1924,8 @@ async function deleteReport(id) {
 function showUpgradePrompt(count) {
   var modal = document.getElementById('modal-upgrade');
   var msgs = {
-    3: { title: '📊 3 Reports Created!', body: 'You\'re halfway through your free reports. Pro unlocks:<br><br>✅ <strong>Unlimited reports</strong> + no watermark<br>✅ <strong>AI Insights</strong> on every chart<br>✅ <strong>Export PNG/PDF</strong><br>✅ <strong>1M chars translation</strong> + 100K tokens cleaning included<br>✅ <strong>Scheduled email reports</strong><br>✅ <strong>30 Docs/month</strong> (no watermark)<br><br>Pro <strong>$15/month</strong> · Team <strong>$45/month</strong> (5 seats).' },
-    5: { title: '🔒 Free Limit Reached', body: 'You\'ve used all 5 free reports.<br><br><strong>Pro $15/mo</strong>: unlimited reports, AI insights, 1M chars translate, 100K tokens clean, PDF export, 30 docs, scheduled emails.<br><br><strong>Team $45/mo</strong>: 5 seats, shared balance pool, shared templates.<br><br>Or delete old reports to free up space.' }
+    3: { title: '📊 3 Reports Created!', body: 'You\'re halfway through your free reports. Pro unlocks:<br><br>✅ <strong>Unlimited reports</strong> + no watermark<br>✅ <strong>AI Insights</strong> on every chart<br>✅ <strong>1M chars translation</strong> + 100K tokens cleaning included<br>✅ <strong>Scheduled email reports</strong><br>✅ <strong>50 Docs/month</strong> (no watermark)<br><br>Pro <strong>$9/month</strong> · Team <strong>$29/month</strong> (5 seats, 5M chars shared).' },
+    5: { title: '🔒 Free Limit Reached', body: 'You\'ve used all 5 free reports.<br><br><strong>Pro $9/mo</strong>: unlimited reports, AI insights, 1M chars translate, 100K tokens clean, 50 docs, scheduled emails.<br><br><strong>Team $29/mo</strong>: 5 seats, 5M chars + 500K tokens shared pool, 200 docs, Slack support.<br><br>Or delete old reports to free up space.' }
   };
   var m = msgs[count] || msgs[5];
   modal.querySelector('h4').textContent = m.title;
@@ -1935,7 +1935,7 @@ function showUpgradePrompt(count) {
   if (btns.length >= 2) {
     btns[0].textContent = count >= 5 ? 'Delete old reports' : 'Maybe later';
     btns[0].onclick = function() { closeModal('modal-upgrade'); if (count >= 5) { toggleReports(); } };
-    btns[1].textContent = '🚀 Upgrade to Pro — $15/month';
+    btns[1].textContent = '🚀 Upgrade to Pro — $9/month';
     btns[1].onclick = function() { closeModal('modal-upgrade'); showTopupModal(); };
   }
   modal.classList.remove('hidden');
