@@ -724,7 +724,7 @@ app.post('/api/stripe/create-checkout', authRequired, async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
-        price_data: { currency: 'usd', product_data: { name: `TableTurn 充值 $${amount} (+$${bonus} 奖励${isFirstTopup?' 含首次充值奖励':'')})` }, unit_amount: amount * 100 },
+        price_data: { currency: 'usd', product_data: { name: 'TableTurn 充值 $' + amount + ' (+$' + bonus + ' 奖励' + (isFirstTopup ? ' 含首次充值奖励' : '') + ')' }, unit_amount: amount * 100 },
         quantity: 1
       }],
       mode: 'payment',
