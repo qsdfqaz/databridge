@@ -211,8 +211,9 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
       <h3>Connect Data Source</h3>
       <div style="display:flex;gap:0;margin-bottom:20px;">
         <button class="btn btn-sm" id="tab-source-airtable" onclick="switchDataSource('airtable')" style="border-radius:8px 0 0 8px;background:var(--accent-light);border-color:var(--accent);color:var(--accent);">📡 Airtable</button>
-        <button class="btn btn-sm btn-outline" id="tab-source-file" onclick="switchDataSource('file')" style="border-radius:0;">📂 Upload CSV/Excel</button>
-        <button class="btn btn-sm btn-outline" id="tab-source-notion" onclick="switchDataSource('notion')" style="border-radius:0 8px 8px 0;">📝 Notion</button>
+        <button class="btn btn-sm btn-outline" id="tab-source-file" onclick="switchDataSource('file')" style="border-radius:0 8px 8px 0;">📂 Upload CSV/Excel</button>
+        <!-- Notion OAuth coming soon -->
+      </div>
       </div>
       <div id="source-airtable">
       <p class="desc">Enter your Airtable PAT and Base ID to get started</p>
