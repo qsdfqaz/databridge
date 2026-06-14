@@ -811,7 +811,7 @@ async function writeBack() {
   document.getElementById('modal-writeback-confirm').classList.remove('hidden');
 }
 
-function doWriteBack() {
+async function doWriteBack() {
   closeModal('modal-writeback-confirm');
   const mode = document.getElementById('write-mode').value;
   const updates = [];
