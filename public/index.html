@@ -1352,14 +1352,13 @@ async function createReport() {
   var chartType = document.getElementById('report-chart-type').value;
 
   try {
-    var res = await api('/api/reports/create', {
-      method: 'POST',
-      body: JSON.stringify({
-        title: title, baseId: state.baseId, tableId: document.getElementById('select-table').value,
-        fields: state.selectedFields, chartType: chartType,
-        config: { records: state.records.slice(0, 50) }
-      })
-    });
+    var body = {
+      title: title, baseId: state.baseId, tableId: document.getElementById('select-table').value,
+      fields: state.selectedFields, chartType: chartType,
+      config: { records: state.records.slice(0, 50) }
+    };
+    if (isDemo) body.demoSessionId = demoSid;
+    var res = await api('/api/reports/create', { method: 'POST', body: JSON.stringify(body) });
     if (!res.ok) throw new Error((await res.json()).error);
     var report = await res.json();
     currentReportId = report.id;
@@ -1416,7 +1415,8 @@ function renderReportPreview(report) {
 var _reportsCache = {};
 async function loadReportsList() {
   try {
-    var res = await api('/api/reports/list');
+    var url = '/api/reports/list' + (isDemo ? '?demoSessionId=' + demoSid : '');
+    var res = await api(url);
     if (!res.ok) return;
     var data = await res.json();
     _reportsCache = {};
@@ -1455,10 +1455,9 @@ async function shareReport() {
   var password = document.getElementById('share-password').value;
   var expiry = document.getElementById('share-expiry').value;
   try {
-    var res = await api('/api/reports/' + currentReportId + '/share', {
-      method: 'POST',
-      body: JSON.stringify({ mode: mode, password: password || null, expiry: expiry || null })
-    });
+    var body = { mode: mode, password: password || null, expiry: expiry || null };
+    if (isDemo) body.demoSessionId = demoSid;
+    var res = await api('/api/reports/' + currentReportId + '/share', { method: 'POST', body: JSON.stringify(body) });
     if (!res.ok) throw new Error((await res.json()).error);
     var data = await res.json();
     document.getElementById('share-url').value = data.shareUrl;
@@ -1475,7 +1474,8 @@ async function shareReport() {
 
 async function unshareReport(id) {
   try {
-    await api('/api/reports/' + id + '/unshare', { method: 'POST' });
+    var body = {}; if (isDemo) body.demoSessionId = demoSid;
+    await api('/api/reports/' + id + '/unshare', { method: 'POST', body: JSON.stringify(body) });
     toast('Link revoked', 'success');
     loadReportsList();
   } catch(e) { toast(e.message, 'error'); }
@@ -1484,7 +1484,8 @@ async function unshareReport(id) {
 async function deleteReport(id) {
   if (!confirm('Delete this report?')) return;
   try {
-    await api('/api/reports/' + id, { method: 'DELETE' });
+    var url = '/api/reports/' + id + (isDemo ? '?demoSessionId=' + demoSid : '');
+    await api(url, { method: 'DELETE' });
     toast('Report deleted');
     loadReportsList();
   } catch(e) { toast(e.message, 'error'); }

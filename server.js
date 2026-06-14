@@ -1272,16 +1272,20 @@ if (!fs.existsSync(REPORTS_FILE)) fs.writeFileSync(REPORTS_FILE, '{}');
 
 const crypto = require('crypto');
 
-// Create report
-app.post('/api/reports/create', authRequired, (req, res) => {
+// Create report (auth optional — demo users can create too)
+app.post('/api/reports/create', (req, res) => {
   try {
-    const { title, baseId, tableId, fields, chartType, config } = req.body;
+    const { title, baseId, tableId, fields, chartType, config, demoSessionId } = req.body;
     if (!title || !fields?.length) return res.status(400).json({ error: 'Title and fields required' });
+
+    // Resolve userId: auth user or demo session
+    const userId = req.userId || (demoSessionId ? 'demo_' + demoSessionId : null);
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
     const reports = readJSON(REPORTS_FILE);
     const id = 'rpt_' + Date.now().toString(36);
     reports[id] = {
-      id, userId: req.userId, title, baseId, tableId, fields, chartType: chartType || 'bar',
+      id, userId, title, baseId, tableId, fields, chartType: chartType || 'bar',
       config: config || {}, shareToken: null, sharePassword: null, shareExpiry: null,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
     };
@@ -1290,19 +1294,28 @@ app.post('/api/reports/create', authRequired, (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// List user's reports
-app.get('/api/reports/list', authRequired, (req, res) => {
+// List user's reports (auth or demo)
+app.get('/api/reports/list', (req, res) => {
+  let userId = req.query.demoSessionId ? 'demo_' + req.query.demoSessionId : null;
+  if (!userId && req.headers.authorization) {
+    try { const p = jwt.verify(req.headers.authorization.slice(7), JWT_SECRET); userId = p.userId; } catch {}
+  }
+  if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
   const reports = readJSON(REPORTS_FILE);
-  const mine = Object.values(reports).filter(r => r.userId === req.userId)
+  const mine = Object.values(reports).filter(r => r.userId === userId)
     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
   res.json({ reports: mine });
 });
 
 // Share a report (generate token)
-app.post('/api/reports/:id/share', authRequired, (req, res) => {
+app.post('/api/reports/:id/share', (req, res) => {
+  let userId = req.body.demoSessionId ? 'demo_' + req.body.demoSessionId : req.userId;
+  if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
   const reports = readJSON(REPORTS_FILE);
   const report = reports[req.params.id];
-  if (!report || report.userId !== req.userId) return res.status(404).json({ error: 'Report not found' });
+  if (!report || report.userId !== userId) return res.status(404).json({ error: 'Report not found' });
 
   const { mode, password, expiry } = req.body; // mode: 'public' | 'password'
   report.shareToken = crypto.randomBytes(16).toString('hex'); // 32-char random, unguessable
@@ -1321,10 +1334,13 @@ app.post('/api/reports/:id/share', authRequired, (req, res) => {
 });
 
 // Unshare a report
-app.post('/api/reports/:id/unshare', authRequired, (req, res) => {
+app.post('/api/reports/:id/unshare', (req, res) => {
+  let userId = req.body.demoSessionId ? 'demo_' + req.body.demoSessionId : req.userId;
+  if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
   const reports = readJSON(REPORTS_FILE);
   const report = reports[req.params.id];
-  if (!report || report.userId !== req.userId) return res.status(404).json({ error: 'Report not found' });
+  if (!report || report.userId !== userId) return res.status(404).json({ error: 'Report not found' });
   report.shareToken = null; report.sharePassword = null; report.shareMode = null; report.shareExpiry = null;
   report.updatedAt = new Date().toISOString();
   writeJSON(REPORTS_FILE, reports);
@@ -1332,10 +1348,13 @@ app.post('/api/reports/:id/unshare', authRequired, (req, res) => {
 });
 
 // Delete report
-app.delete('/api/reports/:id', authRequired, (req, res) => {
+app.delete('/api/reports/:id', (req, res) => {
+  let userId = req.query.demoSessionId ? 'demo_' + req.query.demoSessionId : req.userId;
+  if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
   const reports = readJSON(REPORTS_FILE);
   const report = reports[req.params.id];
-  if (!report || report.userId !== req.userId) return res.status(404).json({ error: 'Report not found' });
+  if (!report || report.userId !== userId) return res.status(404).json({ error: 'Report not found' });
   delete reports[req.params.id];
   writeJSON(REPORTS_FILE, reports);
   res.json({ ok: true });
