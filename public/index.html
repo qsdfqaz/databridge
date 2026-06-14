@@ -381,12 +381,13 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
   <div class="modal">
     <h4>💎 Top Up Credits · 充越多送越多</h4>
     <p class="desc">Balance never expires. Translate $2/M chars · Clean $0.40/K token</p>
-    <p style="font-size:12px;color:var(--green);margin-bottom:12px;" id="first-topup-hint" class="hidden">🎁 First topup: get <strong>50% extra bonus!</strong></p>
+    <p style="font-size:12px;color:var(--green);margin-bottom:12px;" id="first-topup-hint" class="hidden">🎁 First topup: get <strong>20% extra bonus</strong></p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
       <div onclick="selectTopup(2)" class="topup-opt" data-amount="2" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer"><strong>$2</strong><br><span style="font-size:11px;color:var(--muted);">试用 · 到账 $2</span></div>
       <div onclick="selectTopup(10)" class="topup-opt selected" data-amount="10" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--green);border-radius:var(--radius-sm);text-align:center;cursor:pointer;background:var(--green-bg)"><strong>$10</strong><br><span style="font-size:11px;color:var(--green);">到账 $12（送 $2）</span></div>
       <div onclick="selectTopup(50)" class="topup-opt" data-amount="50" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer"><strong>$50</strong><br><span style="font-size:11px;color:var(--green);font-weight:700">🔥 到账 $65（送 $15）</span></div>
       <div onclick="selectTopup(100)" class="topup-opt" data-amount="100" style="flex:1;min-width:80px;padding:14px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer"><strong>$100</strong><br><span style="font-size:11px;color:var(--green);font-weight:700">🚀 到账 $140（送 $40）</span></div>
+      <p style="font-size:10px;color:var(--muted);margin-top:4px;">🎁 First topup bonus: +20% extra on any amount</p>
     </div>
     <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal('modal-topup')">取消</button><button class="btn btn-outline" onclick="doTopup()" style="background:var(--green);color:#fff;border-color:var(--green);">💳 Stripe 支付</button></div>
   </div>

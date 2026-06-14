@@ -745,7 +745,7 @@ app.post('/api/stripe/create-checkout', authRequired, async (req, res) => {
     const isFirstTopup = !user.hasToppedUp;
     const standardBonuses = { 2: 0, 10: 2, 50: 15, 100: 40 };
     let bonus = standardBonuses[amount] || 0;
-    if (isFirstTopup) bonus += parseFloat((amount * 0.5).toFixed(2));
+    if (isFirstTopup) bonus += parseFloat((amount * 0.2).toFixed(2));
     const total = amount + bonus;
 
     const session = await stripe.checkout.sessions.create({
@@ -834,10 +834,10 @@ app.post('/api/users/me/topup', authRequired, (req, res) => {
     const standardBonuses = { 2: 0, 10: 2, 50: 15, 100: 40 };
     let bonus = standardBonuses[ta] || 0;
 
-    // First-time topup: extra 50% bonus (in addition to standard)
+    // First-time topup: extra 20% bonus
     const isFirstTopup = !user.hasToppedUp;
     if (isFirstTopup) {
-      const firstTimeBonus = parseFloat((ta * 0.5).toFixed(2));
+      const firstTimeBonus = parseFloat((ta * 0.2).toFixed(2));
       bonus += firstTimeBonus;
     }
 
