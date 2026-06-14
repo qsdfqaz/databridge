@@ -1522,16 +1522,6 @@ app.post('/api/documents/export-pdf', authRequired, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// robots.txt — block crawlers from report pages
-app.get('/robots.txt', (req, res) => {
-  res.type('text/plain');
-  res.send(`User-agent: *
-Allow: /
-Disallow: /r/
-Disallow: /api/
-Sitemap: https://www.tturn.xyz/sitemap.xml`);
-});
-
 module.exports = app;
 
 // Only listen when running directly (not on Vercel)
