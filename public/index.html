@@ -115,7 +115,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
   <div class="header-right">
     <button class="btn btn-sm btn-outline" id="btn-lang" onclick="switchLang(currentLang==='zh'?'en':'zh')" title="Switch Language">🌐 EN</button>
     <span id="user-email"></span>
-    <span class="status-badge off" id="conn-status">Disconnected</span>
+    <span id="balance-display" style="font-size:12px;color:var(--accent);font-weight:600;margin-right:10px;display:none;">Balance: $0.00</span><span class="status-badge off" id="conn-status">Disconnected</span>
     <span class="bal-badge" id="bal-badge" onclick="showTopupModal()">💎 $0.00</span>
     <button class="btn btn-sm btn-outline hidden" id="btn-dashboard" onclick="toggleDashboard()">📊 Usage</button>
     <button class="btn btn-sm btn-outline hidden" id="btn-templates" onclick="toggleTemplates()">🧩 Templates</button>
@@ -213,7 +213,8 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
         <div class="form-group" style="flex:1;min-width:180px"><label>Base ID</label><input type="text" id="input-base" placeholder="app..."></div>
         <div class="form-group" style="justify-content:end"><button class="btn btn-primary" id="btn-connect" onclick="connectAirtable()">Connect</button></div>
       </div>
-      <p style="font-size:11px;color:var(--muted)">Create a PAT at <a href="https://airtable.com/create/tokens" target="_blank" style="color:var(--accent)">airtable.com/create/tokens</a> with scopes: data.records:read + data.records:write + schema.bases:read</p><p style="font-size:11px;color:var(--accent);margin-top:4px;">🔒 Your PAT is stored only in your browser and never sent to our server.</p>
+      <p style="font-size:11px;color:var(--muted)">Create a PAT at <a href="https://airtable.com/create/tokens" target="_blank" style="color:var(--accent)">airtable.com/create/tokens</a> with scopes: data.records:read + data.records:write + schema.bases:read</p><div style="margin-top:8px;"><button class="btn btn-sm btn-outline" onclick="document.getElementById('pat-tutorial').classList.toggle('hidden')" style="font-size:11px;">How to get your PAT</button><div id="pat-tutorial" class="hidden" style="background:var(--card-bg);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:6px;font-size:12px;color:var(--muted);"><strong>1.</strong> Go to <a href="https://airtable.com/create/tokens" target="_blank" style="color:var(--accent);">airtable.com/create/tokens</a><br><strong>2.</strong> Click "Create new token", name it "TableTurn"<br><strong>3.</strong> Select scopes: data.records:read, data.records:write, schema.bases:read<br><strong>4.</strong> Copy token (starts with <code>pat...</code>) and paste above<br><strong>5.</strong> Find Base ID in URL: <code>airtable.com/<mark>appXXXXXXX</mark>/...</code></div></div>
+<p style="font-size:11px;color:var(--accent);margin-top:4px;">🔒 Your PAT is stored only in your browser and never sent to our server.</p>
     </div>
 
     <!-- Table -->
@@ -480,7 +481,7 @@ function logout() {
 async function onAuthSuccess() {
   document.getElementById('section-auth').classList.add('hidden');
   document.getElementById('app-sections').classList.remove('hidden');
-  document.getElementById('btn-logout').classList.remove('hidden');document.getElementById('btn-change-pwd').classList.remove('hidden');
+  document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-topup-header').style.display='';document.getElementById('btn-change-pwd').classList.remove('hidden');
   document.getElementById('btn-dashboard').classList.remove('hidden');
   document.getElementById('btn-templates').classList.remove('hidden');
   document.getElementById('btn-script').classList.remove('hidden');
@@ -737,8 +738,22 @@ function showResults(data) {
 async function writeBack() {
   if (isDemo) return toast('Demo mode is read-only. Register to write to your own Airtable','error');
   if (!state.lastResults) return toast('No results','error');
+  // Show confirmation first
+  var mode = document.getElementById('write-mode').value;
+  var rowCount = state.records.length;
+  var fieldCount = state.selectedFields.length;
+  var modeLabel = mode === 'overwrite' ? 'OVERWRITE original columns' : 'new _translated/_cleaned columns';
+  var warnStyle = mode === 'overwrite' ? 'color:#dc2626;font-weight:600;' : '';
+  document.getElementById('modal-wb-title').textContent = mode === 'overwrite' ? '⚠️ Confirm Overwrite' : '✅ Confirm Write-Back';
+  document.getElementById('modal-wb-desc').innerHTML = 'Will update <strong>' + rowCount + ' rows</strong> across <strong>' + fieldCount + ' fields</strong>.';
+  document.getElementById('modal-wb-details').innerHTML = '<span style="' + warnStyle + '">Mode: ' + modeLabel + '</span><br><span style="font-size:11px;color:var(--muted);">Results will be written back to Airtable immediately.</span>';
+  document.getElementById('modal-writeback-confirm').classList.remove('hidden');
+}
+
+function doWriteBack() {
+  closeModal('modal-writeback-confirm');
   const mode = document.getElementById('write-mode').value;
-  const updates = [];
+ = [];
   state.records.forEach((r,i)=>{
     const fields = {};
     state.selectedFields.forEach(f=>{
@@ -777,7 +792,7 @@ async function startDemo() {
     document.getElementById('section-auth').classList.add('hidden');
     document.getElementById('app-sections').classList.remove('hidden');
     document.getElementById('demo-banner').classList.remove('hidden');
-    document.getElementById('btn-logout').classList.remove('hidden');document.getElementById('btn-change-pwd').classList.remove('hidden');
+    document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-topup-header').style.display='';document.getElementById('btn-change-pwd').classList.remove('hidden');
     document.getElementById('btn-logout').textContent = 'End Demo';
     document.getElementById('btn-logout').onclick = resetDemo;
     document.getElementById('user-email').textContent = '🧪 Demo User';
