@@ -14,16 +14,29 @@ const stripe = process.env.STRIPE_SECRET_KEY
   ? require('stripe')(process.env.STRIPE_SECRET_KEY)
   : null;
 
-// Nodemailer (email verification)
-const nodemailer = require('nodemailer');
-const mailer = process.env.SMTP_HOST
-  ? nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-    })
-  : null;
+// Resend (email — 100 free/day, custom domain, US-facing)
+const RESEND_KEY = process.env.RESEND_API_KEY || '';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'TableTurn <noreply@tturn.xyz>';
+async function sendEmail({ to, subject, text, html }) {
+  if (!RESEND_KEY) {
+    console.log('[EMAIL] Resend not configured. Would send to', to, ':', subject);
+    return { ok: false, reason: 'not configured' };
+  }
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: EMAIL_FROM, to, subject, text, html })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `Resend error ${res.status}`);
+  }
+  return res.json();
+}
+
+// Keep old nodemailer ref for backwards compat (mailer variable removed)
+const nodemailer = null;
+const mailer = null;
 
 // Trust Railway/cloud proxy for correct client IP (required for rate limiting)
 app.set('trust proxy', 1);
@@ -77,14 +90,14 @@ const MONTHLY_SPEND_LIMIT = 500;  // $500/month per user
 // Email verification code helpers
 function generateCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
 async function sendVerificationEmail(email, code) {
-  if (!mailer) { console.log(`[EMAIL] Would send code ${code} to ${email} (SMTP not configured)`); return; }
-  await mailer.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@databridge.app',
-    to: email,
-    subject: 'TableTurn - 邮箱验证码',
-    text: `您的验证码是：${code}\n\n有效期 10 分钟。如非本人操作请忽略。`,
-    html: `<h2>TableTurn 邮箱验证</h2><p>您的验证码是：<strong style="font-size:24px">${code}</strong></p><p>有效期 10 分钟。</p>`
-  });
+  try {
+    await sendEmail({
+      to: email,
+      subject: `TableTurn Verification Code: ${code}`,
+      text: `Your TableTurn verification code is: ${code}\n\nValid for 10 minutes. If you didn't request this, ignore this email.`,
+      html: `<h2>TableTurn Email Verification</h2><p>Your verification code: <strong style="font-size:24px">${code}</strong></p><p>Valid for 10 minutes.</p><p style="color:#888;font-size:12px;">If you didn't request this, ignore this email.</p>`
+    });
+  } catch(e) { console.error('Verification email failed:', e.message); }
 }
 
 // Backend detection
@@ -161,9 +174,8 @@ async function emailBackupIfNeeded() {
     const reports = readJSON(REPORTS_FILE);
     const count = Object.keys(users).length + Object.keys(reports).length;
     if (count === 0) return;
-    await mailer.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: process.env.SMTP_USER,
+    await sendEmail({
+      to: process.env.ADMIN_EMAIL || RESEND_KEY ? 'qazhappy159@163.com' : 'admin@tturn.xyz',
       subject: `[Backup] TableTurn ${today} — ${Object.keys(users).length} users, ${Object.keys(reports).length} reports`,
       text: JSON.stringify({ users, reports }, null, 2)
     });
@@ -511,17 +523,14 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
     user.resetCodeExpiresAt = Date.now() + 600000; // 10 min
     writeJSON(USERS_FILE, users);
 
-    if (mailer) {
-      await mailer.sendMail({
-        from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@databridge.app',
+    try {
+      await sendEmail({
         to: email,
-        subject: 'TableTurn - Password Reset',
-        text: `Your password reset code is: ${code}\n\nValid for 10 minutes.`,
-        html: `<h2>TableTurn Password Reset</h2><p>Your reset code: <strong style="font-size:24px">${code}</strong></p><p>Valid for 10 minutes.</p>`
+        subject: `TableTurn Password Reset Code: ${code}`,
+        text: `Your TableTurn password reset code is: ${code}\n\nValid for 10 minutes. If you didn't request this, ignore this email.`,
+        html: `<h2>TableTurn Password Reset</h2><p>Your reset code: <strong style="font-size:24px">${code}</strong></p><p>Valid for 10 minutes.</p><p style="color:#888;font-size:12px;">If you didn't request this, ignore this email.</p>`
       });
-    } else {
-      console.log(`[EMAIL] Would send reset code ${code} to ${email}`);
-    }
+    } catch(e) { console.error('Reset email failed:', e.message); }
     res.json({ sent: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1735,15 +1744,14 @@ app.post('/api/reports/:id/send-now', async (req, res) => {
       ? `${req.protocol}://${req.get('host')}/r/${report.shareToken}`
       : 'https://www.tturn.xyz';
 
-    await mailer.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    await sendEmail({
       to: email,
-      subject: `📊 TableTurn Report: ${report.title}`,
+      subject: `TableTurn Report: ${report.title}`,
       html: `<h2>${report.title}</h2>
 <p>Your scheduled report from TableTurn.</p>
 <p><strong>Fields:</strong> ${(report.fields||[]).join(', ')}</p>
-${report.insights ? `<h3>🤖 AI Insights</h3><p>${report.insights.replace(/\n/g,'<br>')}</p>` : ''}
-<p><a href="${shareUrl}" style="display:inline-block;padding:12px 24px;background:#7c3aed;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">📊 View Full Report</a></p>
+${report.insights ? `<h3>AI Insights</h3><p>${report.insights.replace(/\n/g,'<br>')}</p>` : ''}
+<p><a href="${shareUrl}" style="display:inline-block;padding:12px 24px;background:#7c3aed;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">View Full Report</a></p>
 <p style="color:#888;font-size:12px;">Sent by TableTurn · <a href="https://www.tturn.xyz">tturn.xyz</a></p>`
     });
 
@@ -2001,6 +2009,6 @@ app.listen(PORT, () => {
   console.log(`💳 Topup: $2 (trial) | $10 (+$2) | $50 (+$15) | $100 (+$40) — first-time +20% bonus`);
   console.log(`🎁 Demo signup: $1 free credit`);
   console.log(`💳 Stripe: ${stripe ? '✅ configured' : '❌ NOT SET (simulated checkout)'}`);
-  console.log(`📧 Email: ${mailer ? '✅ SMTP configured' : '❌ NOT SET (verification skipped)'}`);
+  console.log(`📧 Email: ${RESEND_KEY ? '✅ Resend (noreply@tturn.xyz)' : '❌ RESEND_API_KEY not set — emails will be logged only'}`);
 });
 }
