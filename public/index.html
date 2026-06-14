@@ -1414,6 +1414,14 @@ async function createReport() {
     loadReportsList();
     // Fetch AI insights in background
     fetchReportInsights(report.id);
+    // Milestone prompts
+    if (report.reportLimit === 5) {
+      setTimeout(function() { showUpgradePrompt(5); }, 2000);
+    } else if (report.reportLimit === 8) {
+      setTimeout(function() { showUpgradePrompt(8); }, 2000);
+    } else if (report.reportLimit === 10) {
+      setTimeout(function() { showUpgradePrompt(10); }, 2000);
+    }
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -1550,6 +1558,28 @@ async function deleteReport(id) {
     toast('Report deleted');
     loadReportsList();
   } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── Upgrade prompts at milestone report counts ──
+function showUpgradePrompt(count) {
+  var modal = document.getElementById('modal-upgrade');
+  var msgs = {
+    5: { title: '📊 5 Reports Created!', body: 'You\'ve created 5 reports. Upgrade to Pro to unlock:<br><br>✅ <strong>Unlimited reports</strong><br>✅ <strong>Remove watermark</strong><br>✅ <strong>Export to PNG/PDF</strong><br>✅ <strong>Real-time data refresh</strong><br><br>Only <strong>$9/month</strong>. Cancel anytime.' },
+    8: { title: '⚠️ Almost at the limit', body: 'You have <strong>2 reports left</strong> before hitting the free limit.<br><br>Upgrade to Pro now and keep all your reports — plus get watermark-free charts, PDF exports, and unlimited sharing.' },
+    10: { title: '🔒 Free Limit Reached', body: 'You\'ve used all 10 free reports.<br><br>Upgrade to Pro ($9/month) for unlimited reports, no watermark, and premium features.<br><br>Or delete old reports to free up space.' }
+  };
+  var m = msgs[count] || msgs[5];
+  modal.querySelector('h4').textContent = m.title;
+  modal.querySelector('.desc').innerHTML = m.body;
+  // Update buttons
+  var btns = modal.querySelectorAll('.modal-actions button');
+  if (btns.length >= 2) {
+    btns[0].textContent = count >= 10 ? 'Delete old reports' : 'Maybe later';
+    btns[0].onclick = function() { closeModal('modal-upgrade'); if (count >= 10) { toggleReports(); } };
+    btns[1].textContent = '🚀 Upgrade to Pro — $9/month';
+    btns[1].onclick = function() { closeModal('modal-upgrade'); showTopupModal(); };
+  }
+  modal.classList.remove('hidden');
 }
 
 // ── Documents (DocuTurn) ──
