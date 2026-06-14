@@ -331,6 +331,16 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
       </div>
       <button class="btn btn-primary" onclick="createReport()">📈 Create Report</button>
       <button class="btn btn-outline" onclick="loadReportsList()" style="margin-left:6px;">📋 My Reports</button>
+      <div id="report-schedule" class="hidden" style="margin-top:12px;padding:12px;background:var(--bg);border-radius:8px;border:1px dashed var(--border);">
+        <strong style="font-size:12px;color:var(--accent);">📧 Scheduled Email (Pro)</strong>
+        <div class="form-row" style="margin-top:6px;">
+          <input type="email" id="schedule-email" placeholder="your@email.com" style="flex:1;min-width:180px;">
+          <select id="schedule-freq"><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select>
+          <button class="btn btn-sm btn-primary" onclick="scheduleReport()">💾 Save</button>
+          <button class="btn btn-sm btn-outline" onclick="sendReportNow()">📤 Send Now</button>
+        </div>
+        <p style="font-size:10px;color:var(--muted);margin-top:4px;">⭐ Pro feature: auto-email this report on schedule</p>
+      </div>
     </div>
 
     <!-- Documents (DocuTurn) -->
@@ -1423,6 +1433,7 @@ async function createReport() {
     var report = await res.json();
     currentReportId = report.id;
     renderReportPreview(report);
+    document.getElementById('report-schedule').classList.remove('hidden');
     var msg = 'Report created!';
     if (report.reportLimit) { msg += ' (' + report.reportLimit + '/' + report.maxReports + ' free reports used)'; }
     if (report.reportLimit && report.reportLimit >= 8) { msg += ' — approaching limit, consider upgrading to Pro'; }
@@ -1441,6 +1452,37 @@ async function createReport() {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+async function scheduleReport() {
+  if (!currentReportId) return toast('Create or select a report first','error');
+  var email = document.getElementById('schedule-email').value.trim();
+  if (!email) return toast('Enter an email address','error');
+  var freq = document.getElementById('schedule-freq').value;
+  try {
+    var res = await fetch('/api/reports/' + currentReportId + '/schedule', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, frequency: freq })
+    });
+    if (!res.ok) throw new Error((await res.json()).error);
+    toast('📧 Report will be sent ' + freq + ' to ' + email, 'success');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function sendReportNow() {
+  if (!currentReportId) return toast('Create or select a report first','error');
+  var email = document.getElementById('schedule-email').value.trim();
+  if (!email) return toast('Enter an email address','error');
+  document.getElementById('schedule-email').disabled = true;
+  try {
+    var res = await fetch('/api/reports/' + currentReportId + '/send-now', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email })
+    });
+    if (!res.ok) throw new Error((await res.json()).error);
+    toast('📤 Report sent to ' + email + '!', 'success');
+  } catch(e) { toast(e.message, 'error'); }
+  document.getElementById('schedule-email').disabled = false;
+}
+
 async function fetchReportInsights(reportId) {
   try {
     var url = '/api/reports/' + reportId + '/insights';
@@ -1451,7 +1493,11 @@ async function fetchReportInsights(reportId) {
       var container = document.getElementById('report-preview');
       var insightDiv = document.createElement('div');
       insightDiv.style.cssText = 'margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;';
-      insightDiv.innerHTML = '<h4 style="font-size:13px;color:var(--accent);margin-bottom:6px;">🤖 AI Insights</h4><p style="font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text);">' + data.insights.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p>';
+      if (data.proRequired) {
+        insightDiv.innerHTML = '<h4 style="font-size:13px;color:var(--accent);margin-bottom:6px;">🤖 AI Insights <span style="font-size:11px;color:var(--muted);">(Pro)</span></h4><p style="font-size:13px;line-height:1.7;color:var(--muted);">' + data.insights + '</p><button class="btn btn-sm btn-primary" onclick="showTopupModal()" style="margin-top:8px;">⭐ Upgrade to Pro — $9/month</button>';
+      } else {
+        insightDiv.innerHTML = '<h4 style="font-size:13px;color:var(--accent);margin-bottom:6px;">🤖 AI Insights</h4><p style="font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text);">' + data.insights.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p>';
+      }
       container.appendChild(insightDiv);
     }
   } catch(e) { /* silent */ }
@@ -1531,6 +1577,11 @@ function viewCachedReport(id) {
   if (!r) return;
   currentReportId = id;
   renderReportPreview(r);
+  document.getElementById('report-schedule').classList.remove('hidden');
+  if (r.scheduleEmail) {
+    document.getElementById('schedule-email').value = r.scheduleEmail;
+    document.getElementById('schedule-freq').value = r.scheduleFrequency || 'weekly';
+  }
   document.getElementById('section-reports').scrollIntoView({behavior:'smooth'});
 }
 

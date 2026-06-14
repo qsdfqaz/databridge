@@ -1437,6 +1437,16 @@ app.post('/api/reports/:id/insights', async (req, res) => {
     const report = reports[req.params.id];
     if (!report) return res.status(404).json({ error: 'Report not found' });
 
+    // Check Pro — AI insights are Pro-only
+    const users = readJSON(USERS_FILE);
+    const owner = Object.values(users).find(u => u.id === report.userId);
+    const isPro = owner && owner.proPlan;
+    // Demo users with demo_ prefix always get insights for free (teaser)
+    const isDemo = report.userId && report.userId.startsWith('demo_');
+    if (!isPro && !isDemo) {
+      return res.json({ insights: '🔒 AI Insights is a Pro feature. Upgrade to Pro ($9/month) to unlock AI-powered data analysis on all your reports.', proRequired: true });
+    }
+
     // Return cached if already generated
     if (report.insights) return res.json({ insights: report.insights, cached: true });
 
@@ -1475,6 +1485,62 @@ app.post('/api/reports/:id/insights', async (req, res) => {
     writeJSON(REPORTS_FILE, reports);
 
     res.json({ insights, cached: false });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Schedule email report (Pro only)
+app.post('/api/reports/:id/schedule', async (req, res) => {
+  try {
+    const reports = readJSON(REPORTS_FILE);
+    const report = reports[req.params.id];
+    if (!report) return res.status(404).json({ error: 'Report not found' });
+
+    // Verify Pro
+    const users = readJSON(USERS_FILE);
+    const owner = Object.values(users).find(u => u.id === report.userId);
+    const isDemo = report.userId && report.userId.startsWith('demo_');
+    if (!owner?.proPlan && !isDemo) {
+      return res.status(402).json({ error: 'Scheduled reports are a Pro feature. Please upgrade.' });
+    }
+
+    const { email, frequency } = req.body; // frequency: 'weekly' | 'monthly'
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    report.scheduleEmail = email;
+    report.scheduleFrequency = frequency || 'weekly';
+    report.updatedAt = new Date().toISOString();
+    writeJSON(REPORTS_FILE, reports);
+    res.json({ ok: true, schedule: { email, frequency: report.scheduleFrequency } });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Send report now via email
+app.post('/api/reports/:id/send-now', async (req, res) => {
+  try {
+    const reports = readJSON(REPORTS_FILE);
+    const report = reports[req.params.id];
+    if (!report) return res.status(404).json({ error: 'Report not found' });
+
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    if (!mailer) return res.status(500).json({ error: 'Email service not configured' });
+
+    const shareUrl = report.shareToken
+      ? `${req.protocol}://${req.get('host')}/r/${report.shareToken}`
+      : 'https://www.tturn.xyz';
+
+    await mailer.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: email,
+      subject: `📊 TableTurn Report: ${report.title}`,
+      html: `<h2>${report.title}</h2>
+<p>Your scheduled report from TableTurn.</p>
+<p><strong>Fields:</strong> ${(report.fields||[]).join(', ')}</p>
+${report.insights ? `<h3>🤖 AI Insights</h3><p>${report.insights.replace(/\n/g,'<br>')}</p>` : ''}
+<p><a href="${shareUrl}" style="display:inline-block;padding:12px 24px;background:#7c3aed;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">📊 View Full Report</a></p>
+<p style="color:#888;font-size:12px;">Sent by TableTurn · <a href="https://www.tturn.xyz">tturn.xyz</a></p>`
+    });
+
+    res.json({ ok: true, message: 'Report sent to ' + email });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
