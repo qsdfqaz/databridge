@@ -386,6 +386,9 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
       <h3>📄 Generate Documents</h3>
       <p class="desc">Turn Airtable data into invoices, reports, receipts — AI writes the content</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;" id="doc-template-list"></div>
+      <div id="doc-custom-prompt" class="hidden" style="margin-bottom:12px;">
+        <div class="form-group" style="flex:1;"><label>Describe what you need</label><input type="text" id="doc-custom-instruction" placeholder="e.g. Generate a client proposal with pricing table and terms" style="width:100%;"></div>
+      </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
         <div class="form-group"><label>Select Records</label><select id="doc-record-count"><option value="1">1 row</option><option value="3">3 rows</option><option value="5">5 rows</option></select></div>
         <button class="btn btn-primary" id="btn-doc-generate" onclick="generateDocument()">🤖 Generate with AI</button>
@@ -1881,10 +1884,17 @@ async function loadDocTemplates() {
   try {
     var res = await fetch('/api/documents/templates');
     var data = await res.json();
-    document.getElementById('doc-template-list').innerHTML = data.templates.map(function(t) {
+    var html = data.templates.map(function(t) {
       return '<div onclick="selectDocTemplate(\'' + t.id + '\',this)" class="topup-opt" data-tpl="' + t.id + '" style="flex:1;min-width:140px;padding:12px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer;">' +
         '<div style="font-size:24px;">' + t.icon + '</div><strong style="font-size:13px;">' + t.name + '</strong><br><span style="font-size:10px;color:var(--muted);">' + t.desc + '</span></div>';
     }).join('');
+    // Add custom template option
+    html += '<div onclick="selectDocTemplate(\'custom\',this)" class="topup-opt" data-tpl="custom" style="flex:1;min-width:140px;padding:12px;border:2px solid var(--border);border-radius:var(--radius-sm);text-align:center;cursor:pointer;">' +
+      '<div style="font-size:24px;">✨</div><strong style="font-size:13px;">Custom / 自定义</strong><br><span style="font-size:10px;color:var(--muted);">Describe what you need</span></div>';
+    // Market teaser
+    html += '<div style="flex:1;min-width:140px;padding:12px;border:1px dashed var(--border);border-radius:var(--radius-sm);text-align:center;color:var(--muted);font-size:11px;">' +
+      '<div style="font-size:20px;">📦</div><strong>More coming soon</strong><br>Contact us for custom templates</div>';
+    document.getElementById('doc-template-list').innerHTML = html;
   } catch(e) {}
 }
 
@@ -1894,7 +1904,9 @@ function selectDocTemplate(id, el) {
   document.querySelectorAll('#doc-template-list > div').forEach(function(d) {
     d.style.borderColor = 'var(--border)'; d.style.background = '';
   });
-  el.style.borderColor = 'var(--accent)'; el.style.background = 'var(--accent-light)';
+  if (el) { el.style.borderColor = 'var(--accent)'; el.style.background = 'var(--accent-light)'; }
+  // Show/hide custom prompt
+  document.getElementById('doc-custom-prompt').classList.toggle('hidden', id !== 'custom');
 }
 
 async function generateDocument() {
@@ -1909,10 +1921,14 @@ async function generateDocument() {
   document.getElementById('btn-doc-generate').disabled = true;
   document.getElementById('btn-doc-generate').textContent = 'Generating...';
   try {
-    var res = await api('/api/documents/generate', {
-      method: 'POST',
-      body: JSON.stringify({ templateId: selectedDocTemplate, records: records, fields: state.selectedFields })
-    });
+    var body = { templateId: selectedDocTemplate, records: records, fields: state.selectedFields };
+    // Custom template: pass user's instruction
+    if (selectedDocTemplate === 'custom') {
+      var customInstr = document.getElementById('doc-custom-instruction').value.trim();
+      if (!customInstr) { document.getElementById('btn-doc-generate').disabled = false; document.getElementById('btn-doc-generate').textContent = '🤖 Generate with AI'; return toast('Describe what you need in the input above','error'); }
+      body.customInstruction = customInstr;
+    }
+    var res = await api('/api/documents/generate', { method: 'POST', body: JSON.stringify(body) });
     if (!res.ok) throw new Error((await res.json()).error);
     var data = await res.json();
     currentDocHtml = data.html;
