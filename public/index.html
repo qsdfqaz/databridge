@@ -18,24 +18,8 @@
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"TableTurn","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"AI-powered data cleaning and translation tool for Airtable. Bulk translate and clean your Airtable data with DeepSeek V4 Pro.","url":"https://www.tturn.xyz","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Organization","name":"TableTurn"}}
 
-// Handle browser back button from demo mode
-window.addEventListener('popstate', function(e) {
-  if (isDemo) {
-    resetDemo();
-    window._demoPushed = false;
-  }
-});
-
 </script>
 <script src="/i18n.js">
-// Handle browser back button from demo mode
-window.addEventListener('popstate', function(e) {
-  if (isDemo) {
-    resetDemo();
-    window._demoPushed = false;
-  }
-});
-
 </script>
 <style>
 :root {
@@ -529,7 +513,7 @@ function logout() {
   token = ''; user = null; localStorage.removeItem('databridge_token');
   document.getElementById('section-auth').classList.remove('hidden');
   document.getElementById('app-sections').classList.add('hidden');
-  document.getElementById('btn-logout').classList.add('hidden');document.getElementById('btn-change-pwd').classList.add('hidden');
+  document.getElementById('btn-logout').classList.add('hidden'); document.getElementById('btn-back-from-demo').style.display='none';document.getElementById('btn-change-pwd').classList.add('hidden');
   document.getElementById('user-email').textContent = '';
   updateBalance(0);
 }
@@ -540,7 +524,7 @@ async function onAuthSuccess() {
     // Hide the hero demo button but keep the heading
     var heroDemoBtn = document.getElementById('hero-demo-btn-main');
     if (heroDemoBtn) heroDemoBtn.style.display = 'none';
-  document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
+  document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); document.getElementById('btn-back-from-demo').style.display=''; var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
   document.getElementById('btn-dashboard').classList.remove('hidden');
   document.getElementById('btn-templates').classList.remove('hidden');
   document.getElementById('btn-script').classList.remove('hidden');
@@ -915,7 +899,7 @@ async function startDemo() {
     var heroDemoBtn = document.getElementById('hero-demo-btn-main');
     if (heroDemoBtn) heroDemoBtn.style.display = 'none';
     document.getElementById('demo-banner').classList.remove('hidden');
-    document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
+    document.getElementById('btn-logout').classList.remove('hidden'); document.getElementById('btn-change-pwd').classList.remove('hidden'); document.getElementById('btn-back-from-demo').style.display=''; var topup = document.getElementById('btn-topup-header'); if (topup) topup.style.display='';
     document.getElementById('btn-logout').textContent = 'End Demo';
     document.getElementById('btn-logout').onclick = resetDemo;
     document.getElementById('user-email').textContent = '🧪 Demo User';
@@ -938,8 +922,7 @@ async function startDemo() {
     ).join('');
     renderDemoTable();
     toast('🧪 Demo mode started! 3 free translations & cleanings'); document.getElementById('demo-pricing-note').classList.remove('hidden');
-    // Push state so back button exits demo
-    if (!window._demoPushed) { window._demoPushed = true; history.pushState({demo:true}, '', '#demo'); }
+    
   } catch(e) { toast('❌ 演示启动失败: '+e.message,'error'); }
 }
 
@@ -973,8 +956,7 @@ function updateDemoCounter() {
 }
 
 function resetDemo() {
-  window._demoPushed = false;
-  history.replaceState(null, '', window.location.pathname);
+  // Reset demo state
   // Hide demo pricing note
   const note = document.getElementById('demo-pricing-note');
   if (note) note.classList.add('hidden');
@@ -989,7 +971,7 @@ function resetDemo() {
   document.getElementById('section-ops').classList.add('hidden');
   document.getElementById('section-results').classList.add('hidden');
   document.getElementById('section-auth').classList.remove('hidden');
-  document.getElementById('btn-logout').classList.add('hidden');document.getElementById('btn-change-pwd').classList.add('hidden');
+  document.getElementById('btn-logout').classList.add('hidden'); document.getElementById('btn-back-from-demo').style.display='none';document.getElementById('btn-change-pwd').classList.add('hidden');
   document.getElementById('user-email').textContent = '';
   document.getElementById('conn-status').textContent = '⚡ Disconnected';
   document.getElementById('conn-status').className = 'status-badge off';
@@ -1281,14 +1263,6 @@ function applyI18nHTML() {
 }
 
 document.addEventListener('DOMContentLoaded', applyI18nHTML);
-
-// Handle browser back button from demo mode
-window.addEventListener('popstate', function(e) {
-  if (isDemo) {
-    resetDemo();
-    window._demoPushed = false;
-  }
-});
 
 </script>
 
