@@ -929,6 +929,42 @@ app.post('/api/demo/start', (req, res) => {
   });
 });
 
+// Demo preview (3 rows, no deduction)
+app.post('/api/demo/preview', async (req, res) => {
+  try {
+    const { sessionId, action, fields, records, sourceLang, targetLang, cleaningInstruction } = req.body;
+    if (!sessionId || !action || !fields?.length || !records?.length) return res.status(400).json({ error: 'Missing required fields' });
+    if (!['translate','clean','both'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
+    const remaining = action === 'both' ? 0 : null;
+    const results = records.map(r => {
+      const out = {};
+      fields.forEach(f => {
+        const val = r[f];
+        if (val != null && val !== '') {
+          out[f] = `[PREVIEW] ${val}`;
+        }
+      });
+      return out;
+    });
+    res.json({ results });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Real preview (3 rows, no charge)
+app.post('/api/preview', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Authentication required' });
+    let userId;
+    try { const d = jwt.verify(token, JWT_SECRET); userId = d.userId; } catch(e) { return res.status(401).json({ error: 'Invalid session' }); }
+    const { action, fields, records, sourceLang, targetLang, cleaningInstruction } = req.body;
+    if (!action || !fields?.length || !records?.length) return res.status(400).json({ error: 'Missing required fields' });
+    // Use same execute logic but with preview flag
+    const result = await executeAIJob(action, fields, records, sourceLang, targetLang, cleaningInstruction);
+    res.json(result);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/demo/execute', async (req, res) => {
   try {
     const { sessionId, action, fields, sourceLang, targetLang, cleaningInstruction } = req.body;

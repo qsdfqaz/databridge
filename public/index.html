@@ -240,17 +240,17 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
         <div class="form-row">
           <div class="form-group"><label>Source</label><select id="trans-source"><option value="">Auto Detect</option><option value="EN">English</option><option value="ZH">Chinese</option><option value="JA">Japanese</option></select></div>
           <div class="form-group"><label>Target</label><select id="trans-target"><option value="ZH">Chinese</option><option value="EN">English</option><option value="JA">Japanese</option></select></div>
-          <button class="btn btn-primary" onclick="estimateAndExecute('translate')">🌐 Translate</button>
+          <button class="btn btn-primary" onclick="estimateAndExecute('translate')" style="margin-right:6px;">Translate</button><button class="btn btn-outline" onclick="previewAction('translate')" style="font-size:12px;">Preview</button>
         </div>
       </div>
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px">
         <h4 style="margin-bottom:6px">🧹 Clean</h4>
         <div class="form-row">
           <div class="form-group" style="flex:1"><label>Instruction</label><input type="text" id="clean-instruction" placeholder="e.g. Remove spaces, standardize names, mark empty..." style="width:100%"></div>
-          <button class="btn btn-primary" onclick="estimateAndExecute('clean')">🧹 Clean</button>
+          <button class="btn btn-primary" onclick="estimateAndExecute('clean')" style="margin-right:6px;">Clean</button><button class="btn btn-outline" onclick="previewAction('clean')" style="font-size:12px;">Preview</button>
         </div>
       </div>
-      <button class="btn btn-primary" onclick="estimateAndExecute('both')" style="background:#7c3aed">⚡ Translate + Clean</button>
+      <button class="btn btn-primary" onclick="estimateAndExecute('both')" style="background:#7c3aed;margin-right:6px;">Translate + Clean</button><button class="btn btn-outline" onclick="previewAction('both')" style="font-size:12px;">Preview</button>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:12px;cursor:pointer;">
         <input type="checkbox" id="batch-mode"> 🔄 Large table? Process in background & email when ready (500+ rows)
       </label>
@@ -714,6 +714,67 @@ async function confirmExecute() {
   document.getElementById('btn-est-confirm').disabled = false;
 }
 
+
+async function previewAction(action) {
+  if (!state.selectedFields.length) return toast('Please select fields','error');
+  if (!state.records.length) return toast('Please load data first','error');
+
+  var rows = state.records.slice(0, 3);
+  var body = {
+    action, fields: state.selectedFields,
+    sourceLang: document.getElementById('trans-source').value,
+    targetLang: document.getElementById('trans-target').value,
+    cleaningInstruction: document.getElementById('clean-instruction').value || 'Clean data',
+    records: rows.map(function(r) { var o = {}; state.selectedFields.forEach(function(f) { if (r[f] !== undefined) o[f] = r[f]; }); return o; }),
+    preview: true
+  };
+
+  document.getElementById('section-ops').classList.add('loading');
+  try {
+    var endpoint = isDemo ? '/api/demo/preview' : '/api/preview';
+    var res = await fetch(API + endpoint, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(isDemo ? Object.assign({}, body, { sessionId: demoSid }) : body)
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    state.pendingAction = action;
+    state.previewData = data;
+
+    var titles = { translate: 'Translation Preview', clean: 'Cleaning Preview', both: 'Translate + Clean Preview' };
+    document.getElementById('modal-preview-title').textContent = titles[action] || 'Preview Changes';
+
+    // Build comparison table
+    var html = '<table><thead><tr><th>#</th><th>Original</th><th>Result</th></tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++) {
+      var orig = rows[i];
+      var res = data.results[i];
+      for (var j = 0; j < state.selectedFields.length; j++) {
+        var f = state.selectedFields[j];
+        var origVal = (orig[f] || '').toString().slice(0, 120);
+        var resVal = (res[f] || '').toString().slice(0, 120);
+        var changed = origVal !== resVal;
+        html += '<tr><td>' + (i+1) + '.' + f.slice(0,8) + '</td><td style="' + (changed ? 'background:#fef2f2;' : '') + '">' + escapeHtml(origVal) + '</td><td style="' + (changed ? 'background:#f0fdf4;' : '') + '">' + escapeHtml(resVal) + '</td></tr>';
+      }
+    }
+    html += '</tbody></table>';
+    document.getElementById('preview-table-container').innerHTML = html;
+    document.getElementById('modal-preview').classList.remove('hidden');
+  } catch(e) { toast(e.message, 'error'); }
+  document.getElementById('section-ops').classList.remove('loading');
+}
+
+function confirmFromPreview() {
+  closeModal('modal-preview');
+  estimateAndExecute(state.pendingAction);
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+
 function showResults(data) {
   const section = document.getElementById('section-results'); section.classList.remove('hidden');
   document.getElementById('result-desc').textContent = `Cost: $${data.cost.toFixed(4)} · 余额 $${data.newBalance.toFixed(2)} · 后端: ${data.backend}`;
@@ -987,7 +1048,20 @@ function showSaveTemplate() {
 function showAirtableScript() {
   fetch('/api/airtable-script').then(r=>r.json()).then(d => {
     const w = window.open('','_blank','width=700,height=500');
-    w.document.write(`<html><head><title>Airtable Script</title><style>body{font-family:monospace;padding:20px;background:#1a1a2e;color:#a0a0b0;line-height:1.6}pre{background:#0d1117;padding:16px;border-radius:8px;overflow:auto;font-size:12px}h2{color:#fff}ol li{margin:8px 0}</style></head><body><h2>📜 Airtable Scripting Extension</h2><ol>${d.instructions.map(i=>'<li>'+i+'</li>').join('')}</ol><h2>脚本代码</h2><pre>${d.script.replace(/</g,'&lt;')}</pre><button onclick="navigator.clipboard.writeText(document.querySelector('pre').textContent);alert('已复制')" style="padding:8px 16px;margin-top:8px;">📋 复制代码</button></body></html>`);
+    w.document.write(`<html><head><title>Airtable Script</title><style>body{font-family:monospace;padding:20px;background:#1a1a2e;color:#a0a0b0;line-height:1.6}pre{background:#0d1117;padding:16px;border-radius:8px;overflow:auto;font-size:12px}h2{color:#fff}ol li{margin:8px 0}</style></head><body><h2>📜 Airtable Scripting Extension</h2><ol>${d.instructions.map(i=>'<li>'+i+'</li>').join('')}</ol><h2>脚本代码</h2><pre>${d.script.replace(/</g,'&lt;')}</pre><button onclick="navigator.clipboard.writeText(document.querySelector('pre').textContent);alert('已复制')" style="padding:8px 16px;margin-top:8px;">📋 复制代码</button>
+  <!-- Preview modal -->
+  <div id="modal-preview" class="modal-overlay hidden">
+    <div class="modal" style="max-width:700px;">
+      <h4 id="modal-preview-title">Preview Changes</h4>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Showing first 3 rows for review</p>
+      <div class="table-wrap" id="preview-table-container" style="max-height:400px;overflow-y:auto;"></div>
+      <div class="modal-actions" style="margin-top:12px;">
+        <button class="btn btn-outline" onclick="closeModal('modal-preview')">Cancel</button>
+        <button class="btn btn-primary" id="btn-preview-confirm" onclick="confirmFromPreview()">Looks good, execute for all rows</button>
+      </div>
+    </div>
+  </div>
+</body></html>`);
   });
 }
 
@@ -1134,5 +1208,18 @@ function applyI18nHTML() {
 
 document.addEventListener('DOMContentLoaded', applyI18nHTML);
 </script>
+
+  <!-- Preview modal -->
+  <div id="modal-preview" class="modal-overlay hidden">
+    <div class="modal" style="max-width:700px;">
+      <h4 id="modal-preview-title">Preview Changes</h4>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Showing first 3 rows for review</p>
+      <div class="table-wrap" id="preview-table-container" style="max-height:400px;overflow-y:auto;"></div>
+      <div class="modal-actions" style="margin-top:12px;">
+        <button class="btn btn-outline" onclick="closeModal('modal-preview')">Cancel</button>
+        <button class="btn btn-primary" id="btn-preview-confirm" onclick="confirmFromPreview()">Looks good, execute for all rows</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
