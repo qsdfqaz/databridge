@@ -107,6 +107,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
 .hero-demo-btn{padding:16px 36px!important;font-size:17px!important;border-radius:var(--radius)!important;background:linear-gradient(135deg,#7c3aed,#a78bfa)!important;box-shadow:0 4px 32px rgba(124,58,237,0.5)!important;animation:pulse 2s infinite}
 .hero-demo-btn:hover{transform:translateY(-2px)!important;box-shadow:0 8px 40px rgba(124,58,237,0.7)!important}
 @keyframes pulse{0%,100%{box-shadow:0 4px 32px rgba(124,58,237,0.5)}50%{box-shadow:0 4px 48px rgba(124,58,237,0.8)}}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -219,6 +220,11 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
     <!-- Table -->
     <div class="card hidden" id="section-table">
       <h3>📋 Select Table & Fields</h3>
+      <div id="table-placeholder" style="text-align:center;padding:40px 20px;color:var(--muted);border:2px dashed var(--border);border-radius:var(--radius-sm);margin-bottom:12px;">
+        <div style="font-size:32px;margin-bottom:8px;">🔌</div>
+        <strong style="color:var(--text);">Connect your Airtable to see tables and fields</strong>
+        <p style="font-size:12px;margin-top:4px;">Enter your PAT and Base ID above, then click Connect</p>
+      </div>
       <div class="form-row">
         <div class="form-group"><label>Table</label><select id="select-table" onchange="loadFields()"><option>-- Connect first --</option></select></div>
         <div class="form-group"><label>Rows</label><select id="select-max-rows"><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option></select></div>
@@ -679,13 +685,22 @@ window.addEventListener('popstate', function(e) {
 async function connectAirtable() {
   const pat = document.getElementById('input-pat').value.trim();
   const baseId = document.getElementById('input-base').value.trim();
-  if (!pat) return toast('请输入 PAT','error');
-  if (!baseId) return toast('请输入 Base ID','error');
+  if (!pat) return toast('Please enter your PAT','error');
+  if (!baseId) return toast('Please enter your Base ID','error');
   state.pat = pat; state.baseId = baseId;
-  document.getElementById('btn-connect').disabled = true;
+  const btn = document.getElementById('btn-connect');
+  btn.disabled = true;
+  btn.innerHTML = '<span style="display:inline-block;animation:spin 0.8s linear infinite;">⏳</span> Connecting...';
+  document.getElementById('conn-status').textContent = '⏳ Connecting...';
+  document.getElementById('conn-status').className = 'status-badge off';
   try {
     const res = await api(`/api/bases/${baseId}/tables`, { headers:{'x-airtable-pat':pat} });
-    if (!res.ok) throw new Error((await res.json()).error);
+    if (!res.ok) {
+      const errData = await res.json().catch(()=>({}));
+      const msg = errData.error || 'Connection failed';
+      if (res.status === 401 || res.status === 403) throw new Error('Invalid PAT or Base ID. Please check and try again.');
+      throw new Error(msg);
+    }
     const data = await res.json();
     state.tables = data.tables;
     document.getElementById('select-table').innerHTML = data.tables.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
@@ -694,10 +709,16 @@ async function connectAirtable() {
     document.getElementById('header-base-info').textContent = '📁 '+baseId.slice(0,12)+'...';
     document.getElementById('section-table').classList.remove('hidden');
     document.getElementById('section-ops').classList.remove('hidden');
+    document.getElementById('table-placeholder').classList.add('hidden');
     await loadFields(); await loadRecords();
-    toast('✅ Connected！');
-  } catch(e) { toast('❌ '+e.message,'error'); }
-  document.getElementById('btn-connect').disabled = false;
+    toast('✅ Connected! Select a table and load records.', 'success');
+  } catch(e) {
+    toast(e.message, 'error');
+    document.getElementById('conn-status').textContent = '❌ Connection failed';
+    document.getElementById('conn-status').className = 'status-badge off';
+  }
+  btn.disabled = false;
+  btn.innerHTML = 'Connect';
 }
 
 // ── Fields ──
@@ -1008,6 +1029,7 @@ async function startDemo() {
     document.getElementById('section-connect').classList.add('hidden');
     document.getElementById('section-ops').classList.remove('hidden');
     document.getElementById('section-table').classList.remove('hidden');
+    document.getElementById('table-placeholder').classList.add('hidden');
     updateDemoCounter();
     updateBalance(-1); // hide balance display
 
@@ -1074,6 +1096,7 @@ function resetDemo() {
   document.getElementById('app-sections').classList.add('hidden');
   document.getElementById('section-connect').classList.remove('hidden');
   document.getElementById('section-table').classList.add('hidden');
+  document.getElementById('table-placeholder').classList.remove('hidden');
   document.getElementById('section-ops').classList.add('hidden');
   document.getElementById('section-results').classList.add('hidden');
   document.getElementById('section-auth').classList.remove('hidden');
