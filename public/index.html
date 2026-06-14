@@ -172,13 +172,6 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
     <p style="font-size:11px;color:var(--muted);margin-top:12px;">Your password is encrypted. Email verification required.</p>
     <p style="font-size:11px;color:var(--green);margin-top:4px;">Your Airtable PAT stays in your browser — never uploaded to our server.</p>
 
-    <div style="margin-top:20px; padding-top:20px; border-top:1px solid var(--border); text-align:center;">
-      <p style="font-size:13px; color:var(--muted); margin-bottom:10px;">Not ready to sign up? Try the demo first</p>
-      <button class="btn btn-primary" onclick="startDemo()" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);font-size:15px;padding:12px 28px;">
-        🧪 Live Demo (3 Free)
-      </button>
-      <p style="font-size:11px;color:var(--muted);margin-top:8px;">Sample data · 3 free translations & cleanings · No registration</p>
-    </div>
   </div>
 
   <!-- Email verification banner (shown when not verified) -->
@@ -202,7 +195,7 @@ tr:hover td{background:rgba(124,58,237,0.06)}td.result-new{background:var(--gree
       </div>
     </div>
     <button class="btn btn-primary" id="btn-connect-cta-demo" onclick="showConnectModal()" style="background:linear-gradient(135deg,#7c3aed,#a855f7);font-size:14px;white-space:nowrap;padding:8px 18px;box-shadow:0 2px 8px rgba(124,58,237,0.3);">⚡ Connect your own Airtable</button>
-    <span style="font-size:11px;color:var(--muted);margin-left:12px;">Already have an account? <a href="#" onclick="showLoginFromDemo()" style="color:var(--accent);font-weight:600;">Log in</a> or <a href="#" onclick="showRegisterFromDemo()" style="color:var(--accent);font-weight:600;">Sign up</a></span>
+    <span style="font-size:11px;color:#a16207;margin-left:12px;"><a href="#" onclick="showLoginFromDemo()" style="color:#7c3aed;font-weight:600;">TableTurn Log in</a> · <a href="#" onclick="showRegisterFromDemo()" style="color:#7c3aed;font-weight:600;">Sign up</a></span>
   </div>
 
   <!-- App sections (hidden until auth/demo) -->
@@ -587,6 +580,18 @@ if (urlParams.get('topup') === 'success') {
   window.history.replaceState({}, '', '/');
 }
 
+// Handle browser back button from demo mode
+window.addEventListener('popstate', function(e) {
+  if (isDemo) {
+    resetDemo();
+    // Show hero + auth
+    document.getElementById('section-hero').classList.remove('hidden');
+    document.getElementById('section-auth').classList.remove('hidden');
+    document.getElementById('section-auth').style.display = 'block';
+    document.getElementById('section-auth').scrollIntoView({behavior:'smooth',block:'center'});
+  }
+});
+
 // ── Connect ──
 async function connectAirtable() {
   const pat = document.getElementById('input-pat').value.trim();
@@ -922,7 +927,9 @@ async function startDemo() {
     ).join('');
     renderDemoTable();
     toast('🧪 Demo mode started! 3 free translations & cleanings'); document.getElementById('demo-pricing-note').classList.remove('hidden');
-    
+    // Push history so browser back button returns to home instead of blank
+    if (!window._demoHistoryPushed) { history.pushState({demo:true}, '', '#demo'); window._demoHistoryPushed = true; }
+
   } catch(e) { toast('❌ 演示启动失败: '+e.message,'error'); }
 }
 
@@ -957,6 +964,7 @@ function updateDemoCounter() {
 
 function resetDemo() {
   // Reset demo state
+  window._demoHistoryPushed = false;
   // Hide demo pricing note
   const note = document.getElementById('demo-pricing-note');
   if (note) note.classList.add('hidden');
